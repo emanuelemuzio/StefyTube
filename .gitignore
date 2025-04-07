@@ -1,0 +1,38 @@
+# Bytecode e cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Cartelle temporanee PyInstaller
+build/
+*.spec
+
+# Output build
+dist/
+StefyTubeApp/
+StefyTube.exe
+
+# File di log
+*.log
+logs/
+
+# Cartelle dati locali
+downloads/
+playlist/
+
+# Icone, binari extra
+ffmpeg.exe
+icon.ico
+
+# Cartelle IDE/editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Altri
+.DS_Store
+Thumbs.db
+_internal
+venv
