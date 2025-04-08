@@ -22,9 +22,10 @@
     <ul class="list-group" id="playlistList">
       {% for name in playlists %}
       <li class="list-group-item bg-dark text-white d-flex justify-content-between align-items-center">
-        <span>{{ name }}</span>
+        <a href="/playlist/{{ name }}" class="btn btn-sm px-4" style="background-color: #d71612; color:white"> 
+          {{ name }}
+        </a>
         <div class="d-flex gap-2">
-          <a href="/playlist/{{ name }}" class="btn btn-sm" style="background-color: #d71612; color:white">Visualizza</a>
           <button class="btn btn-sm" style="background-color: #d71612;" onclick="deletePlaylist('{{ name }}')">🗑️</button>
         </div>
       </li>

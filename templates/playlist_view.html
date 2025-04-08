@@ -4,15 +4,16 @@
 {% import 'macros.html' as macros %}
 
 <head>
-  <title>StefyTube</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>StefyTube</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
-    {{ macros.navbar() }} 
+    {{ macros.navbar() }}
 
     <div class="container mt-4">
+        {{ macros.logo() }}
         <h3 class="mb-3">🎧 Playlist: {{ playlist.name }}</h3>
 
         {% if playlist.tracks %}
@@ -34,13 +35,22 @@
 
 
         <div class="text-center mb-3 d-flex justify-content-center gap-2">
-            <button class="btn btn-shuffle" onclick="playInOrder()">▶️ Riproduzione sequenziale</button>
-            <button class="btn btn-secondary" onclick="prevTrack()">⏮️</button>
-            <button class="btn btn-secondary" onclick="nextTrack()">⏭️</button>
+            <button class="btn btn-secondary" onclick="prevTrack()">Precedente</button>
+
+            <button id="shuffleToggle" class="btn" style="background-color: #d71612; color: white; border: none;"
+                onclick="toggleShuffle()">
+                Riproduzione casuale: OFF
+            </button>
+
+            <button class="btn btn-secondary" onclick="nextTrack()">Successivo</button>
         </div>
 
+
         <div class="text-center mt-3">
-            <audio id="audioPlayer" controls hidden style="width: 90%; max-width: 600px;"></audio>
+            <audio id="audioPlayer" controls style="width: 90%; max-width: 600px;" class="d-block mx-auto" hidden>
+                <source id="audioSource" src="" type="audio/mpeg">
+                Il tuo browser non supporta l'audio.
+            </audio>
             <div id="nowPlaying" class="mt-2 fw-bold"></div>
         </div>
         {% else %}
@@ -49,13 +59,67 @@
     </div>
 
     <script>
-        const playlist = {{ playlist.tracks| tojson }};
-        let queue = [];
-        let current = 0;
+        let shuffleEnabled = false;
+        let originalPlaylist = {{ playlist.tracks | tojson | safe }};
+        let playlist = [...originalPlaylist];
+        let currentIndex = 0;
+
+
         const audio = document.getElementById('audioPlayer');
+        const source = document.getElementById('audioSource');
         const nowPlaying = document.getElementById('nowPlaying');
+        const trackList = document.getElementById('trackList');
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function highlightTrack(filename) {
+            const items = document.querySelectorAll('#trackList li');
+            items.forEach(item => {
+              const isCurrent = item.dataset.filename === filename;
+              item.classList.toggle('active', isCurrent);
+            });
+          }
+          
+
+        function playTrack(index) {
+            const file = playlist[index];
+            source.src = `/downloads/${file}`;
+            audio.load();
+            audio.play();
+            nowPlaying.textContent = `🎵 In riproduzione: ${file}`;
+            highlightTrack(index);
+        }
+
+        function nextTrack() {
+            currentIndex = (currentIndex + 1) % playlist.length;
+            playTrack(currentIndex);
+        }
+
+        function prevTrack() {
+            currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+            playTrack(currentIndex);
+        }
+
+        function toggleShuffle() {
+            shuffleEnabled = !shuffleEnabled;
+            const btn = document.getElementById('shuffleToggle');
+            btn.textContent = `🎲 Riproduzione casuale: ${shuffleEnabled ? 'ON' : 'OFF'}`;
+
+            playlist = shuffleEnabled ? shuffle([...originalPlaylist]) : [...originalPlaylist];
+            currentIndex = 0;
+            playTrack(currentIndex);
+        }
+
+
+        // Interrompe tutti gli altri audio nella pagina
         const allAudios = Array.from(document.querySelectorAll('audio'));
-        if (audio && !allAudios.includes(audio)) {
+        if (!allAudios.includes(audio)) {
             allAudios.push(audio);
         }
 
@@ -70,108 +134,18 @@
             });
         });
 
-        function highlightActiveTrack(filename) {
-            const items = document.querySelectorAll('#trackList li');
-            items.forEach(item => {
-                if (item.dataset.filename === filename) {
-                    item.classList.add('active-track');
-                } else {
-                    item.classList.remove('active-track');
-                }
-            });
-        }
+        // Quando il brano finisce, passa al successivo
+        audio.addEventListener('ended', nextTrack);
 
-
-        function playInOrder() {
-            if (!playlist.length) return;
-            queue = [...playlist];
-            current = 0;
-            audio.hidden = false;
-            loadTrack(current);
-        }
-
-        function playRandom() {
-            if (!playlist.length) return;
-            queue = [...playlist];
-            for (let i = queue.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [queue[i], queue[j]] = [queue[j], queue[i]];
-            }
-            current = 0;
-            audio.hidden = false;
-            loadTrack(current);
-        }
-
-        function loadTrack(index) {
-            const file = queue[index];
-            audio.src = `/downloads/${file}`;
-            audio.load();
-            audio.play();
-            nowPlaying.textContent = `🎵 In riproduzione: ${file}`;
-            highlightActiveTrack(file);
-        }
-
-        document.querySelectorAll('audio').forEach(audioEl => {
-            audioEl.addEventListener('play', () => {
-                document.querySelectorAll('audio').forEach(other => {
-                    if (other !== audioEl) {
-                        other.pause();
-                        other.currentTime = 0;
-                    }
-                });
-            });
-        });
-
-
-        function nextTrack() {
-            if (current < queue.length - 1) {
-                current++;
-                loadTrack(current);
-            } else {
-                nowPlaying.textContent = '✅ Playlist terminata.';
-            }
-        }
-
-        function prevTrack() {
-            if (current > 0) {
-                current--;
-                loadTrack(current);
-            }
-        }
-
-        audio.onended = () => {
-            nextTrack();
+        // Autoplay iniziale
+        window.onload = () => {
+            audio.addEventListener('ended', nextTrack)
         };
 
-        function removeTrack(playlist, track, index) {
-            if (!confirm(`Vuoi rimuovere "${track}" da "${playlist}"?`)) return;
-
-            fetch('/playlist/remove', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ playlist, track })
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        const row = document.getElementById(`track-${index}`);
-                        if (row) row.remove();
-
-                        // Rimuovilo dalla coda se è in riproduzione
-                        if (queue.length) {
-                            queue = queue.filter(t => t !== track);
-                            if (current >= queue.length) {
-                                audio.pause();
-                                nowPlaying.textContent = '✅ Playlist aggiornata.';
-                            }
-                        }
-                    } else {
-                        alert('Errore: ' + data.error);
-                    }
-                });
-        }
-
+        
     </script>
+
+
 
 </body>
 

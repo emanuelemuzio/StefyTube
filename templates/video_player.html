@@ -13,6 +13,15 @@
   {{ macros.navbar() }}
 
   <div class="container mt-4">
+
+    <div id="liveProgressBlock">
+      {% for p in progress if p.status != 'finished' %}
+      <div class="alert alert-info text-center">
+        Download in corso: <strong>{{ p.filename }}</strong> ({{ p.progress }}%)
+      </div>
+      {% endfor %}
+    </div>
+
     <h3 class="mb-4">🎥 Video scaricati</h3>
 
     {% if progress.status != 'idle' and progress.status != 'finished' %}
@@ -36,6 +45,33 @@
     <div class="alert alert-info">Non ci sono video disponibili nella cartella downloads.</div>
     {% endif %}
   </div>
+
+  <script>
+    function updateLiveProgressBlock() {
+      const block = document.getElementById('liveProgressBlock');
+      if (!block) return;
+
+      fetch('/progress')
+        .then(res => res.json())
+        .then(data => {
+          const active = data.filter(p => p.status !== 'finished' && p.format === 'mp4');
+          if (!active.length) {
+            block.innerHTML = '';
+            return;
+          }
+
+          block.innerHTML = active.map(p => `
+            <div class="alert alert-info text-center">
+              ⏳ Download in corso: <strong>${p.filename || '(in preparazione...)'}</strong> (${p.progress}%)
+            </div>
+          `).join('');
+        });
+    }
+
+    // Avvia aggiornamento periodico
+    setInterval(updateLiveProgressBlock, 3000);
+    updateLiveProgressBlock();
+  </script>
 </body>
 
 </html>

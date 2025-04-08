@@ -11,16 +11,18 @@
 
 <body>
 
-{{ macros.navbar() }}
+  {{ macros.navbar() }}
 
   <div class="container-lg mt-5">
     {{ macros.logo() }}
 
-    {% if progress.status != 'idle' and progress.status != 'finished' %}
-    <div class="alert alert-info text-center">
-      ⏳ Download in corso: <strong>{{ progress.filename }}</strong> ({{ progress.progress }}%)
+    <div id="liveProgressBlock">
+      {% for p in progress if p.status != 'finished' %}
+      <div class="alert alert-info text-center">
+        Download in corso: <strong>{{ p.filename }}</strong> ({{ p.progress }}%)
+      </div>
+      {% endfor %}
     </div>
-    {% endif %}
 
     {{ macros.playerShuffle() }}
 
@@ -30,7 +32,8 @@
       <li class="list-group-item d-flex justify-content-between align-items-center" id="item-{{ loop.index }}">
         <span>{{ file }}</span>
         <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-sm" style="background-color: #d71612;" onclick="deleteFile('{{ file }}', {{ loop.index }})">🗑</button>
+          <button class="btn btn-sm" style="background-color: #d71612;"
+            onclick="deleteFile('{{ file }}', {{ loop.index }})">🗑</button>
           <audio controls style="min-width: 300px">
             <source src="{{ url_for('download_file', filename=file) }}" type="audio/mpeg">
           </audio>
@@ -150,6 +153,30 @@
         });
     }
 
+    function updateLiveProgressBlock() {
+      const block = document.getElementById('liveProgressBlock');
+      if (!block) return;
+    
+      fetch('/progress')
+        .then(res => res.json())
+        .then(data => {
+          const active = data.filter(p => p.status !== 'finished' && p.format === 'mp3');
+          if (!active.length) {
+            block.innerHTML = '';
+            return;
+          }
+    
+          block.innerHTML = active.map(p => `
+            <div class="alert alert-info text-center">
+              ⏳ Download in corso: <strong>${p.filename || '(in preparazione...)'}</strong> (${p.progress}%)
+            </div>
+          `).join('');
+        });
+    }
+    
+    // Avvia aggiornamento periodico
+    setInterval(updateLiveProgressBlock, 3000);
+    updateLiveProgressBlock();
   </script>
 
 </body>

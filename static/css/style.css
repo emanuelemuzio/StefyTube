@@ -101,3 +101,9 @@ video {
     border-radius: 10px;
     box-shadow: 0 0 10px #111;
 }
+
+#trackList li.active {
+    background-color: #d71612 !important;
+    color: white;
+    font-weight: bold;
+}

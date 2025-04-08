@@ -9,6 +9,10 @@ import subprocess
 import platform
 import re
 import unicodedata
+import argparse
+import webbrowser
+import socket
+from datetime import datetime, timedelta
 
 # === Percorsi e directory ===
 
@@ -28,84 +32,77 @@ sys.stdout = open(log_path, 'w')
 sys.stderr = open(log_path, 'w')
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
-progress_data = {'status': 'idle', 'progress': 0, 'filename': ''}
+progress_data = []
+
+def clean_progress_data(timeout_sec=120):
+    now = datetime.utcnow()
+    progress_data[:] = [
+        d for d in progress_data
+        if d['status'] != 'downloading' or (now - d.get('last_update', now)) < timedelta(seconds=timeout_sec)
+    ]
 
 # === Funzione di download ===
 # Funzione principale di download
 def download_video(url, format_choice):
-    
-    download_id = len(progress_data)  # identificativo univoco
     entry = {
-        'id': download_id,
         'status': 'starting',
         'progress': 0,
         'filename': '',
-        'format': format_choice
+        'format': format_choice,
+        'last_update': datetime.utcnow()
     }
-    progress_data.append(entry) 
 
-    safe_title = ''  # inizializziamo safe_title
+    progress_data.append(entry)
+    entry_index = len(progress_data) - 1  # usato per aggiornare questo specifico download
 
     def hook(d):
-        nonlocal safe_title
         if d['status'] == 'downloading':
             total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
-            downloaded_bytes = d.get('downloaded_bytes', 0)
+            downloaded = d.get('downloaded_bytes', 0)
             if total_bytes:
-                progress_data[download_id]['progress'] = int(downloaded_bytes / total_bytes * 100)
-                progress_data[download_id]['status'] = 'downloading'
+                percent = int(downloaded / total_bytes * 100)
+                progress_data[entry_index]['progress'] = percent
+                progress_data[entry_index]['status'] = 'downloading'
+                progress_data[entry_index]['last_update'] = datetime.utcnow()
+
         elif d['status'] == 'finished':
             raw_title = d['info_dict'].get('title', 'video')
             safe_title = sanitize_filename(raw_title)
             ext = 'mp3' if format_choice == 'mp3' else 'mp4'
-            progress_data[download_id]['filename'] = f"{safe_title}.{ext}"
-            progress_data[download_id]['status'] = 'finished'
-            progress_data[download_id]['progress'] = 100
+            filename = f"{safe_title}.{ext}"
+            progress_data[entry_index]['filename'] = filename
+            progress_data[entry_index]['status'] = 'finished'
+            progress_data[entry_index]['progress'] = 100
+            progress_data[entry_index]['last_update'] = datetime.utcnow()
 
-    # Impostazioni di base
+    # Costruisci le opzioni yt-dlp
     ydl_opts = {
-        'ffmpeg_location': FFMPEG_PATH,
         'progress_hooks': [hook],
-        'outtmpl': os.path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),  # iniziale, sarà rinominato
+        'ffmpeg_location': FFMPEG_PATH,
+        'outtmpl': os.path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),
         'quiet': True,
-        'merge_output_format': 'mp4'
     }
 
     if format_choice == 'mp3':
-        ydl_opts.update({
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
-        })
+        ydl_opts['format'] = 'bestaudio/best'
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }]
     elif format_choice == 'mp4':
-        ydl_opts.update({
-            'format': 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/mp4',
-            'merge_output_format': 'mp4'
-        })
+        ydl_opts['format'] = 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/mp4'
+        ydl_opts['merge_output_format'] = 'mp4'
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
-            result = ydl.download([url])
-
-            # Dopo il download, rinomina il file in modo sicuro
-            if safe_title:
-                # Trova il file reale appena scaricato
-                for file in os.listdir(DOWNLOAD_DIR):
-                    if file.startswith(raw_title):
-                        ext = 'mp3' if format_choice == 'mp3' else 'mp4'
-                        old_path = os.path.join(DOWNLOAD_DIR, file)
-                        new_path = os.path.join(DOWNLOAD_DIR, f"{safe_title}.{ext}")
-                        os.rename(old_path, new_path)
-                        break
-
+            ydl.download([url])
     except Exception as e:
-        progress_data['status'] = 'error'
-        progress_data['progress'] = 0
-        progress_data['filename'] = str(e)
-            
+        progress_data[entry_index]['status'] = 'error'
+        progress_data[entry_index]['progress'] = 0
+        progress_data[entry_index]['filename'] = str(e)
+        progress_data[entry_index]['last_update'] = datetime.utcnow()
+                  
 def sanitize_filename(title):
     title = unicodedata.normalize('NFKD', title)
     title = re.sub(r'[\\/*?:"<>|]', '_', title)  # Rimuove i caratteri vietati su Windows
@@ -121,15 +118,13 @@ def index():
 def download():
     url = request.form['url']
     format_choice = request.form['format']
-    progress_data['status'] = 'starting'
-    progress_data['progress'] = 0
-    progress_data['filename'] = ''
     threading.Thread(target=download_video, args=(url, format_choice)).start()
     return jsonify({'message': 'Download avviato'})
 
 @app.route('/progress')
 def progress():
-    return jsonify([d for d in progress_data if d['status'] != 'finished' and d['progress'] < 100])
+    clean_progress_data(timeout_sec=120)
+    return jsonify(progress_data)
 
 @app.route('/logo')
 def logo():
@@ -142,7 +137,7 @@ def player():
         if f.endswith('.mp3'):
             full_path = os.path.join(DOWNLOAD_DIR, f)
             if os.path.isfile(full_path) and os.path.getsize(full_path) > 0:
-                if not (progress_data['filename'] == f and progress_data['status'] != 'finished'):
+                if not any(d['filename'] == f and d['status'] != 'finished' for d in progress_data):
                     files.append(f)
 
     playlist_files = [os.path.splitext(f)[0] for f in os.listdir(PLAYLIST_DIR) if f.endswith('.json')]
@@ -226,9 +221,9 @@ def playlists():
 def show_playlist(name):
     path = os.path.join(PLAYLIST_DIR, f'{name}.json')
     if os.path.exists(path):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            return render_template('playlist_view.html', playlist=data)
+            return render_template('playlist_view.html', playlist=data, tracks=data, name=name)
     return f'Playlist \"{name}\" non trovata', 404
 
 @app.route('/playlist/create', methods=['POST'])
@@ -273,7 +268,8 @@ def video_player():
         if f.endswith('.mp4'):
             full_path = os.path.join(DOWNLOAD_DIR, f)
             if os.path.isfile(full_path) and os.path.getsize(full_path) > 0:
-                if not (progress_data['filename'] == f and progress_data['status'] != 'finished'):
+                # Escludi file ancora in download
+                if not any(d['filename'] == f and d['status'] != 'finished' for d in progress_data):
                     videos.append(f)
 
     return render_template('video_player.html', videos=videos, progress=progress_data)
@@ -293,22 +289,58 @@ def open_downloads():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+import time
+
 # === Avvio ===
 def start_flask():
-    app.run()
+    app.run(host='127.0.0.1', port=5000)
+    
+def open_in_chrome(url='http://127.0.0.1:5000'):
+    try:
+        chrome = webbrowser.get(using='chrome')
+        # chrome.open(url)
+        print("Apertura in Chrome riuscita.")
+    except webbrowser.Error:
+        print("Chrome non trovato. Apro nel browser predefinito.")
+        # webbrowser.open(url)
+    
+def wait_for_flask(host='127.0.0.1', port=5000, timeout=20):
+    print(f"Aspetto che Flask sia disponibile su {host}:{port}...")
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                print("Flask è attivo!")
+                return True
+        except (ConnectionRefusedError, socket.timeout):
+            time.sleep(1)
+    print("Timeout: Flask non è partito.")
+    return False
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--window', action='store_true', help='Avvia in modalità finestra (PyWebView)')
+    args = parser.parse_args()
+    
+    print(1)
+
+    # Avvia il server Flask in background
     threading.Thread(target=start_flask, daemon=True).start()
-    screen = webview.screens[0]
-    w = screen.width
-    h = screen.height
-    webview.create_window(
-        'StefyTube',
-        'http://127.0.0.1:5000',
-        width=w,
-        height=h
-    )
-    webview.start()
+
+    if args.window:
+        # Modalità finestra (desktop app)
+        screen = webview.screens[0]
+        w = int(screen.width * 0.8)
+        h = int(screen.height * 0.8)
+        webview.create_window('StefyTube', 'http://127.0.0.1:5000', width=w, height=h)
+        webview.start()
+    else:
+        # modalità browser
+        if wait_for_flask():
+            open_in_chrome('http://127.0.0.1:5000')
+        else:
+            print("Non sono riuscito ad aprire il browser: Flask non è partito.")
+        input("Premi INVIO per terminare il server...\n")
 
     # Chiudi log
     sys.stdout.close()
