@@ -1,59 +1,41 @@
 <!DOCTYPE html>
 <html>
+
+{% import 'macros.html' as macros %}
+
 <head>
-  <title>StefyTube - Video Player</title>
+  <title>StefyTube</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background-color: #0e0e0e; color: #f1f1f1; }
-    .video-wrapper { margin-bottom: 2rem; }
-    video {
-      width: 100%;
-      max-width: 800px;
-      height: auto;
-      border-radius: 10px;
-      box-shadow: 0 0 10px #111;
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-          <div class="collapse navbar-collapse justify-content-end">
-            <ul class="navbar-nav">
-              <li class="nav-item">
-                <a class="nav-link{% if request.path == '/' %} active{% endif %}" href="/">Downloader</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link{% if request.path == '/player' %} active{% endif %}" href="/player">Player</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link{% if request.path.startswith('/playlist') %} active{% endif %}" href="/playlists">Playlist</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link{% if request.path == '/video-player' %} active{% endif %}"
-                    href="/video-player">Video</a>
-            </li>
-            </ul>
-          </div>
-        </div>
-      </nav>
+  {{ macros.navbar() }}
 
   <div class="container mt-4">
     <h3 class="mb-4">🎥 Video scaricati</h3>
 
+    {% if progress.status != 'idle' and progress.status != 'finished' %}
+    <div class="alert alert-info text-center">
+      ⏳ Download video in corso: <strong>{{ progress.filename }}</strong> ({{ progress.progress }}%)
+    </div>
+    {% endif %}
+
+
     {% if videos %}
-      {% for video in videos %}
-        <div class="video-wrapper">
-          <h5>{{ video }}</h5>
-          <video controls>
-            <source src="{{ url_for('download_file', filename=video) }}" type="video/mp4">
-            Il tuo browser non supporta il tag video.
-          </video>
-        </div>
-      {% endfor %}
+    {% for video in videos %}
+    <div class="video-wrapper">
+      <h5>{{ video }}</h5>
+      <video controls>
+        <source src="{{ url_for('download_file', filename=video) }}" type="video/mp4">
+        Il tuo browser non supporta il tag video.
+      </video>
+    </div>
+    {% endfor %}
     {% else %}
-      <div class="alert alert-info">Non ci sono video disponibili nella cartella downloads.</div>
+    <div class="alert alert-info">Non ci sono video disponibili nella cartella downloads.</div>
     {% endif %}
   </div>
 </body>
+
 </html>

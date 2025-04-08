@@ -1,172 +1,113 @@
 <!DOCTYPE html>
 <html>
 
+{% import 'macros.html' as macros %}
+
 <head>
   <title>StefyTube</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <style>
-    body {
-      background-color: #100f12;
-      color: #f1f1f1;
-    }
-
-    .form-control {
-      background-color: #1e1e1e;
-      color: #f1f1f1;
-      border: 1px solid #444;
-      box-shadow: none !important;
-    }
-
-    .form-control::placeholder {
-      color: #999;
-    }
-
-    .form-control:focus {
-      background-color: #1e1e1e;
-      color: #f1f1f1;
-      border: 1px solid #444;
-      outline: none;
-      box-shadow: none;
-    }
-
-    .progress {
-      background-color: #333;
-    }
-
-    .progress-bar {
-      background-color: #e50914;
-    }
-
-    .btn-primary {
-      background-color: #e50914;
-      border: none;
-    }
-
-    .btn-primary:hover {
-      background-color: #c40812;
-    }
-
-    .btn-success {
-      background-color: #3ddc84;
-      border: none;
-    }
-
-    .btn-success:hover {
-      background-color: #2cc570;
-    }
-
-    .btn-outline-dark {
-      color: #f1f1f1;
-      border-color: #f1f1f1;
-    }
-
-    .btn-outline-dark:hover {
-      background-color: #f1f1f1;
-      color: #121212;
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-      <div class="collapse navbar-collapse justify-content-end">
-        <ul class="navbar-nav">
-          <li class="nav-item">
-            <a class="nav-link{% if request.path == '/' %} active{% endif %}" href="/">Downloader</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link{% if request.path == '/player' %} active{% endif %}" href="/player">Player</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link{% if request.path.startswith('/playlist') %} active{% endif %}"
-              href="/playlists">Playlist</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link{% if request.path == '/video-player' %} active{% endif %}" href="/video-player">Video</a>
-          </li>
-        </ul>
-      </div>
-    </div>
-  </nav>
-
+  {{ macros.navbar() }}
 
   <div class="container-lg mt-5">
-    <div class="text-center mb-4">
-      <img src="/logo" alt="StefyTube Logo" style="max-height: 120px;">
-    </div>
+    {{ macros.logo() }}
 
-    <form id="downloadForm">
-      <div class="mb-3">
-        <input type="text" name="url" class="form-control" placeholder="Incolla il link di YouTube" required>
-      </div>
-      <div class="row justify-content-center mb-3">
-        <div class="col-auto">
-          <select id="formatSelect" class="form-select bg-dark text-white border-secondary">
-            <option value="mp3">Scarica in MP3</option>
-            <option value="mp4">Scarica in MP4</option>
-          </select>
-        </div>
-        <div class="col-auto">
-          <button type="submit" class="btn btn-primary">Scarica</button>
-        </div>
-        <div class="text-center mt-4">
-          <button class="btn btn-secondary" onclick="openDownloads()">📂 Apri cartella Downloads</button>
-        </div>
-      </div>
+    {{ macros.downloadForm() }}
 
-    </form>
-
-    <div class="progress" style="height: 25px; display: none;">
+    <!-- <div class="progress" style="height: 25px; display: none;">
       <div class="progress-bar" role="progressbar" style="width: 0%;" id="progressBar">0%</div>
-    </div>
+    </div> -->
 
-    <div class="mt-3" id="statusMessage"></div>
+    {{ macros.downloadStatus() }}
+    <!-- <div class="mt-3" id="statusMessage"></div> -->
+    <script>
+      let formatSelected = 'mp3';
+
+      $('#downloadForm').submit(function (e) {
+        e.preventDefault();
+        const formatSelected = $('#formatSelect').val();
+        const url = $('input[name="url"]').val();
+
+        $('#statusMessage').text('');
+        $('.progress').show();
+        $('#progressBar').css('width', '0%').text('0%');
+
+        $.post('/download', { url, format: formatSelected }, function (response) {
+          checkProgress();
+        });
+      });
+
+      function checkProgress() {
+        const interval = setInterval(() => {
+          $.get('/progress', function (data) {
+            const progress = data.progress;
+            $('#progressBar').css('width', progress + '%').text(progress + '%');
+
+            if (data.status === 'finished') {
+              clearInterval(interval);
+              $('#statusMessage').html('<div class="alert alert-light">Download completato: ' + data.filename + '</div>');
+            } else if (data.status === 'error') {
+              clearInterval(interval);
+              $('#statusMessage').html('<div class="alert alert-danger">Errore: ' + data.filename + '</div>');
+            }
+          });
+        }, 1000);
+      }
+
+      function openDownloads(e) {
+        e.preventDefault();
+        fetch('/open-downloads')
+          .then(res => res.json())
+          .then(data => {
+            if (!data.success) alert("Errore: " + data.error);
+          });
+      }
+
+      function updateDownloadStatus() {
+        fetch('/progress')
+          .then(res => res.json())
+          .then(data => {
+            const container = document.getElementById('downloadStatus');
+            if (!data.length) {
+              container.innerHTML = '';
+              return;
+            }
+
+            const relevant = data.filter(d => {
+              {% if 'player' in request.path %}
+              return d.format === 'mp3';
+              {% elif 'video-player' in request.path %}
+              return d.format === 'mp4';
+              {% else %}
+              return true;
+              {% endif %}
+            });
+
+            if (!relevant.length) {
+              container.innerHTML = '';
+              return;
+            }
+
+            container.innerHTML = '<h5 class="mb-2">⏳ Download in corso:</h5>' + relevant.map(d =>
+              `<div class="mb-2 p-2 bg-dark text-light rounded">
+              <strong>${d.filename || '(in preparazione...)'}</strong><br>
+              Stato: ${d.status} – ${d.progress}%
+              <div class="progress mt-1" style="height: 8px;">
+                <div class="progress-bar bg-info" style="width: ${d.progress}%"></div>
+              </div>
+            </div>`
+            ).join('');
+          });
+      }
+
+      setInterval(updateDownloadStatus, 3000);
+      updateDownloadStatus();
+    </script>
   </div>
 
-  <script>
-    let formatSelected = 'mp3';
-
-    $('#downloadForm').submit(function (e) {
-      e.preventDefault();
-      const formatSelected = $('#formatSelect').val();
-      const url = $('input[name="url"]').val();
-
-      $('#statusMessage').text('');
-      $('.progress').show();
-      $('#progressBar').css('width', '0%').text('0%');
-
-      $.post('/download', { url, format: formatSelected }, function (response) {
-        checkProgress();
-      });
-    });
-
-    function checkProgress() {
-      const interval = setInterval(() => {
-        $.get('/progress', function (data) {
-          const progress = data.progress;
-          $('#progressBar').css('width', progress + '%').text(progress + '%');
-
-          if (data.status === 'finished') {
-            clearInterval(interval);
-            $('#statusMessage').html('<div class="alert alert-light">Download completato: ' + data.filename + '</div>');
-          } else if (data.status === 'error') {
-            clearInterval(interval);
-            $('#statusMessage').html('<div class="alert alert-danger">Errore: ' + data.filename + '</div>');
-          }
-        });
-      }, 1000);
-    }
-
-    function openDownloads() {
-      fetch('/open-downloads')
-        .then(res => res.json())
-        .then(data => {
-          if (!data.success) alert("Errore: " + data.error);
-        });
-    }
-  </script>
 </body>
 
 </html>

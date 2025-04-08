@@ -7,6 +7,8 @@ from yt_dlp import YoutubeDL
 import json
 import subprocess
 import platform
+import re
+import unicodedata
 
 # === Percorsi e directory ===
 
@@ -29,43 +31,86 @@ app = Flask(__name__, template_folder=TEMPLATE_DIR)
 progress_data = {'status': 'idle', 'progress': 0, 'filename': ''}
 
 # === Funzione di download ===
+# Funzione principale di download
 def download_video(url, format_choice):
+    
+    download_id = len(progress_data)  # identificativo univoco
+    entry = {
+        'id': download_id,
+        'status': 'starting',
+        'progress': 0,
+        'filename': '',
+        'format': format_choice
+    }
+    progress_data.append(entry) 
+
+    safe_title = ''  # inizializziamo safe_title
+
     def hook(d):
+        nonlocal safe_title
         if d['status'] == 'downloading':
             total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
             downloaded_bytes = d.get('downloaded_bytes', 0)
             if total_bytes:
-                progress_data['progress'] = int(downloaded_bytes / total_bytes * 100)
-                progress_data['status'] = 'downloading'
+                progress_data[download_id]['progress'] = int(downloaded_bytes / total_bytes * 100)
+                progress_data[download_id]['status'] = 'downloading'
         elif d['status'] == 'finished':
-            progress_data['progress'] = 100
-            progress_data['status'] = 'finished'
-            progress_data['filename'] = d['info_dict'].get('title', '')
+            raw_title = d['info_dict'].get('title', 'video')
+            safe_title = sanitize_filename(raw_title)
+            ext = 'mp3' if format_choice == 'mp3' else 'mp4'
+            progress_data[download_id]['filename'] = f"{safe_title}.{ext}"
+            progress_data[download_id]['status'] = 'finished'
+            progress_data[download_id]['progress'] = 100
 
+    # Impostazioni di base
     ydl_opts = {
         'ffmpeg_location': FFMPEG_PATH,
         'progress_hooks': [hook],
-        'outtmpl': os.path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),
+        'outtmpl': os.path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),  # iniziale, sarà rinominato
+        'quiet': True,
         'merge_output_format': 'mp4'
     }
 
     if format_choice == 'mp3':
-        ydl_opts['format'] = 'bestaudio/best'
-        ydl_opts['postprocessors'] = [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
+        ydl_opts.update({
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }]
+        })
     elif format_choice == 'mp4':
-        ydl_opts['format'] = 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/mp4'
+        ydl_opts.update({
+            'format': 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/mp4',
+            'merge_output_format': 'mp4'
+        })
 
-    with YoutubeDL(ydl_opts) as ydl:
-        try:
-            ydl.download([url])
-        except Exception as e:
-            progress_data['status'] = 'error'
-            progress_data['progress'] = 0
-            progress_data['filename'] = str(e)
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            result = ydl.download([url])
+
+            # Dopo il download, rinomina il file in modo sicuro
+            if safe_title:
+                # Trova il file reale appena scaricato
+                for file in os.listdir(DOWNLOAD_DIR):
+                    if file.startswith(raw_title):
+                        ext = 'mp3' if format_choice == 'mp3' else 'mp4'
+                        old_path = os.path.join(DOWNLOAD_DIR, file)
+                        new_path = os.path.join(DOWNLOAD_DIR, f"{safe_title}.{ext}")
+                        os.rename(old_path, new_path)
+                        break
+
+    except Exception as e:
+        progress_data['status'] = 'error'
+        progress_data['progress'] = 0
+        progress_data['filename'] = str(e)
+            
+def sanitize_filename(title):
+    title = unicodedata.normalize('NFKD', title)
+    title = re.sub(r'[\\/*?:"<>|]', '_', title)  # Rimuove i caratteri vietati su Windows
+    title = re.sub(r'\s+', ' ', title).strip()  # Spazi multipli → uno solo
+    return title[:200]  # Evita nomi troppo lunghi
 
 # === Rotte Flask ===
 @app.route('/')
@@ -84,7 +129,7 @@ def download():
 
 @app.route('/progress')
 def progress():
-    return jsonify(progress_data)
+    return jsonify([d for d in progress_data if d['status'] != 'finished' and d['progress'] < 100])
 
 @app.route('/logo')
 def logo():
@@ -92,9 +137,30 @@ def logo():
 
 @app.route('/player')
 def player():
-    files = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.mp3')]
+    files = []
+    for f in os.listdir(DOWNLOAD_DIR):
+        if f.endswith('.mp3'):
+            full_path = os.path.join(DOWNLOAD_DIR, f)
+            if os.path.isfile(full_path) and os.path.getsize(full_path) > 0:
+                if not (progress_data['filename'] == f and progress_data['status'] != 'finished'):
+                    files.append(f)
+
     playlist_files = [os.path.splitext(f)[0] for f in os.listdir(PLAYLIST_DIR) if f.endswith('.json')]
-    return render_template('player.html', files=files, playlists=playlist_files)
+    return render_template('player.html', files=files, playlists=playlist_files, progress=progress_data)
+
+@app.route('/delete-playlist', methods=['POST'])
+def delete_playlist():
+    name = request.json.get('name')
+    file_path = os.path.join(PLAYLIST_DIR, f"{name}.json")
+
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    else:
+        return jsonify({'success': False, 'error': 'Playlist non trovata'})
 
 @app.route('/playlist/remove', methods=['POST'])
 def remove_from_playlist():
@@ -202,8 +268,15 @@ def add_to_playlist():
 
 @app.route('/video-player')
 def video_player():
-    videos = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.mp4')]
-    return render_template('video_player.html', videos=videos)
+    videos = []
+    for f in os.listdir(DOWNLOAD_DIR):
+        if f.endswith('.mp4'):
+            full_path = os.path.join(DOWNLOAD_DIR, f)
+            if os.path.isfile(full_path) and os.path.getsize(full_path) > 0:
+                if not (progress_data['filename'] == f and progress_data['status'] != 'finished'):
+                    videos.append(f)
+
+    return render_template('video_player.html', videos=videos, progress=progress_data)
 
 @app.route('/open-downloads')
 def open_downloads():

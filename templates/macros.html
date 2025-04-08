@@ -1,0 +1,76 @@
+{% macro navbar() %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <div class="collapse navbar-collapse justify-content-end">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link{% if request.path == '/' %} active{% endif %}" href="/">Downloader</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link{% if request.path == '/player' %} active{% endif %}" href="/player">Player</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link{% if request.path.startswith('/playlist') %} active{% endif %}"
+                        href="/playlists">Playlist</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link{% if request.path == '/video-player' %} active{% endif %}"
+                        href="/video-player">Video</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+{% endmacro %}
+
+{% macro downloadStatus() %}
+<div id="downloadStatus" class="mb-4"></div>
+{% endmacro %}
+
+{% macro downloadForm() %}
+<form id="downloadForm">
+    <div class="mb-3">
+        <input type="text" name="url" class="form-control" placeholder="Incolla il link di YouTube" required>
+    </div>
+    <div class="row justify-content-center mb-3">
+        <div class="col-auto">
+            <select id="formatSelect" class="form-select bg-dark text-white border-secondary">
+                <option value="mp3">Scarica in MP3</option>
+                <option value="mp4">Scarica in MP4</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Scarica</button>
+        </div>
+        <div class="text-center mt-4">
+            <button class="btn btn-secondary" onclick="openDownloads(event)">📂 Apri cartella Downloads</button>
+        </div>
+    </div>
+</form>
+{% endmacro %}
+
+{% macro logo() %}
+<div class="text-center mb-4">
+    <img src="/logo" alt="StefyTube Logo" style="max-height: 120px;">
+</div>
+{% endmacro %}
+
+{% macro playerShuffle() %}
+<div class="text-center mb-4">
+    <button class="btn mb-3" onclick="startShuffle()" style="background-color: #d71612; color: white; border: none;">
+        Riproduzione casuale
+    </button>
+
+    <div class="d-flex justify-content-center align-items-center gap-2 mb-2" style="display: none;" id="controlsRow">
+        <button class="btn btn-secondary" onclick="prevTrack()">Precedente</button>
+        <button class="btn btn-secondary" onclick="nextTrack()">Successiva</button>
+    </div>
+
+    <audio id="audioPlayer" controls style="width: 90%; max-width: 600px;" class="d-block mx-auto" hidden>
+        <source id="audioSource" src="" type="audio/mpeg">
+        Il tuo browser non supporta l'audio.
+    </audio>
+
+    <div class="mt-2" id="nowPlaying" style="font-weight: bold;"></div>
+</div>
+{% endmacro %} 
