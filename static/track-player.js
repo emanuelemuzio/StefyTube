@@ -6,54 +6,54 @@ let shuffle = false;
 let selectedTrackUuid = '';
 
 function openPlaylistModal(trackTitle, trackUuid) {
-  selectedTrackUuid = trackUuid;
-  document.getElementById('modalTrackName').textContent = trackTitle;
+    selectedTrackUuid = trackUuid;
+    document.getElementById('modalTrackName').textContent = trackTitle;
 
-  // Carica playlist di tipo "track"
-  fetch('/api/playlist-data')
-    .then(res => res.json())
-    .then(data => {
-      const select = document.getElementById('playlistSelect');
-      select.innerHTML = '<option selected disabled>Scegli una playlist...</option>';
+    // Carica playlist di tipo "track"
+    fetch('/api/playlist-data')
+        .then(res => res.json())
+        .then(data => {
+            const select = document.getElementById('playlistSelect');
+            select.innerHTML = '<option selected disabled>Scegli una playlist...</option>';
 
-      (data['track-playlist'] || []).forEach(pl => {
-        const option = document.createElement('option');
-        option.value = pl.uuid || pl;  // supporta sia {uuid, name} che stringa
-        option.textContent = pl.name || pl;
-        select.appendChild(option);
-      });
+            (data['track-playlist'] || []).forEach(pl => {
+                const option = document.createElement('option');
+                option.value = pl.uuid || pl;  // supporta sia {uuid, name} che stringa
+                option.textContent = pl.name || pl;
+                select.appendChild(option);
+            });
 
-      const modal = new bootstrap.Modal(document.getElementById('playlistModal'));
-      modal.show();
-    });
+            const modal = new bootstrap.Modal(document.getElementById('playlistModal'));
+            modal.show();
+        });
 }
 
 function confirmAddToPlaylist() {
-  const select = document.getElementById('playlistSelect');
-  const playlistUuid = select.value;
+    const select = document.getElementById('playlistSelect');
+    const playlistUuid = select.value;
 
-  if (!playlistUuid || !selectedTrackUuid) {
-    alert("Seleziona una playlist valida");
-    return;
-  }
+    if (!playlistUuid || !selectedTrackUuid) {
+        alert("Seleziona una playlist valida");
+        return;
+    }
 
-  fetch('/api/track-playlist/add', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      playlist: playlistUuid,
-      track: selectedTrackUuid,
+    fetch('/api/track-playlist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            playlist: playlistUuid,
+            track: selectedTrackUuid,
+        })
     })
-  })
-    .then(res => res.json())
-    .then(data => {
-      alert(data.message || 'Aggiunta completata');
-      bootstrap.Modal.getInstance(document.getElementById('playlistModal')).hide();
-    })
-    .catch(err => {
-      console.error(err);
-      alert("Errore durante l’aggiunta alla playlist");
-    });
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message || 'Aggiunta completata');
+            bootstrap.Modal.getInstance(document.getElementById('playlistModal')).hide();
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Errore durante l’aggiunta alla playlist");
+        });
 }
 
 function shuffleTracks(originalArray) {
@@ -76,12 +76,8 @@ function shuffleTracks(originalArray) {
 
 function playTrack(index) {
 
-    if (shuffle) {
-        currentTrackIndex = index;
-    }
-    else {
-        currentShuffleIndex = index
-    }
+    currentTrackIndex = index;
+    currentShuffleIndex = index;
 
     const audio = document.getElementById('audioPlayer');
     const source = document.getElementById('audioSource');
@@ -99,8 +95,18 @@ function playTrack(index) {
     audio.load();
     audio.play();
 
+    document.querySelectorAll('.track-active').forEach(el => {
+        el.classList.remove('track-active');
+    });
+
+    // Aggiungi highlight a quello in riproduzione
+    const activeItem = document.getElementById(`item-${index + 1}`);
+    if (activeItem) {
+        activeItem.classList.add('track-active');
+    }
+
     audio.hidden = false;
-    nowPlaying.innerText = `In riproduzione: ${title}`;
+    nowPlaying.textContent = `In riproduzione: ${title}`;
 }
 
 function nextTrack() {
@@ -233,7 +239,7 @@ function fetchFiles() {
                 fileList.appendChild(li);
             });
         });
-} 
+}
 
 // Esegui subito al caricamento
 document.addEventListener('DOMContentLoaded', () => {

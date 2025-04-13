@@ -116,6 +116,7 @@ def start_download():
         Body:
             url : str
             format: str [mp3, mp4] 
+            noplaylist: bool
 
     Response:
         message : str
@@ -124,7 +125,8 @@ def start_download():
     data = request.get_json()
     url = data.get('url')
     format_choice = data.get('format')
-    threading.Thread(target=download_video, args=(url, format_choice)).start()
+    noplaylist = data.get('noplaylist')
+    threading.Thread(target=download_video, args=(url, format_choice, noplaylist)).start()
     return jsonify({'message': 'Download avviato'}), 200
 
 @app.get('/api/progress')
@@ -463,7 +465,7 @@ def save_metadata(entry):
     with open(metadata_path, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
-def download_video(url, format_choice):
+def download_video(url, format_choice, noplaylist):
     uuid = str(uuid4())
     
     entry = {
@@ -506,6 +508,7 @@ def download_video(url, format_choice):
         'ffmpeg_location': FFMPEG_PATH,
         'outtmpl': os.path.join(DOWNLOAD_DIR, f'{uuid}.%(ext)s'),
         'quiet': True,
+        'noplaylist' : noplaylist
     }
 
     if format_choice == 'mp3':

@@ -1,4 +1,21 @@
 let lastStartedDownload = null;
+const playlistSelect = document.getElementById('noplaylistSelect') 
+const urlInput = document.getElementById('linkInput');
+
+urlInput.addEventListener('input', () => {
+    const url = urlInput.value;
+    const fullOption = playlistSelect.querySelector('option[value="false"]');
+    const isPlaylist = url.includes('list=');
+  
+    // Abilita/disabilita opzione "scarica playlist"
+    fullOption.disabled = !isPlaylist;
+  
+    // Se l'opzione è disabilitata ed è selezionata, forza il valore su "true"
+    if (!isPlaylist && playlistSelect.value === 'false') {
+      playlistSelect.value = 'true';
+    }
+  });
+
 
 $('#downloadForm').on('submit', function (e) {
     e.preventDefault();
@@ -15,7 +32,8 @@ $('#downloadForm').on('submit', function (e) {
         },
         body: JSON.stringify({
             url: url,
-            format: formatSelected
+            format: formatSelected,
+            noplaylist: playlistSelect.value === 'true'
         })
     })
         .then(() => {
