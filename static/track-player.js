@@ -68,7 +68,7 @@ function shuffleTracks(originalArray) {
         [array[currentIndex], array[randomIndex]] = [
             array[randomIndex], array[currentIndex]
         ];
-    }
+    } 
 
     return array;
 }
@@ -88,6 +88,7 @@ function playTrack(index) {
         return;
     }
 
+    const activeIndex = trackList.indexOf(shuffleTrackList[index])
     const track = shuffle ? shuffleTrackList[index] : trackList[index]
     const filename = track.filename;
     const title = track.title;
@@ -100,7 +101,7 @@ function playTrack(index) {
     });
 
     // Aggiungi highlight a quello in riproduzione
-    const activeItem = document.getElementById(`item-${index + 1}`);
+    const activeItem = document.getElementById(`item-${activeIndex + 1}`);
     if (activeItem) {
         activeItem.classList.add('track-active');
     }
@@ -207,6 +208,9 @@ function fetchFiles() {
             const data = response.data;
             trackList = data.tracks;
             shuffleTrackList = shuffleTracks(trackList)
+
+            console.log(trackList)
+            console.log(shuffleTrackList)
 
             const fileList = document.getElementById('fileList');
             const alertBox = document.getElementById('noFilesAlert');

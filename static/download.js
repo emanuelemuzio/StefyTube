@@ -37,6 +37,7 @@ $('#downloadForm').on('submit', function (e) {
         })
     })
         .then(() => {
+            alert("Download avviato!")
             lastStartedDownload = { format: formatSelected };  // usa per filtrare i progressi
         });
 });

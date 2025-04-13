@@ -466,51 +466,46 @@ def save_metadata(entry):
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
 def download_video(url, format_choice, noplaylist):
-    uuid = str(uuid4())
-    
-    entry = {
-        'status': 'starting',
-        'progress': 0,
-        'filename': f'{uuid}.{format_choice}',
-        'title' : '',
-        'uuid' : uuid,
-        'format': format_choice,
-        'last_update': datetime.utcnow()
-    }
-
-    progress_data.append(entry)
-    entry_index = len(progress_data) - 1  # usato per aggiornare questo specifico download
-
     def hook(d):
-        if d['status'] == 'downloading':
-            total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
-            downloaded = d.get('downloaded_bytes', 0)
-            if total_bytes:
-                percent = int(downloaded / total_bytes * 100)
-                progress_data[entry_index]['progress'] = percent
-                progress_data[entry_index]['status'] = 'downloading'
-                progress_data[entry_index]['last_update'] = datetime.utcnow()
+        if d['status'] != 'finished':
+            return
 
-        elif d['status'] == 'finished':
-            raw_title = d['info_dict'].get('title', 'video')
-            safe_title = sanitize_filename(raw_title)
-            # ext = 'mp3' if format_choice == 'mp3' else 'mp4'
-            # filename = f"{safe_title}.{ext}"
-            # progress_data[entry_index]['filename'] = filename
-            progress_data[entry_index]['status'] = 'finished'
-            progress_data[entry_index]['progress'] = 100
-            progress_data[entry_index]['title'] = safe_title
-            progress_data[entry_index]['last_update'] = datetime.utcnow()
+        info = d['info_dict']
+        video_id = info.get('id')
+        if not video_id:
+            return
 
-    # Costruisci le opzioni yt-dlp
+        title = sanitize_filename(info.get('title', 'video'))
+        ext = 'mp3' if format_choice == 'mp3' else 'mp4'
+        filename = f"{video_id}.{ext}"
+
+        entry = {
+            'uuid': video_id,   
+            'status': 'finished',
+            'progress': 100,
+            'filename': filename,
+            'title': title,
+            'format': format_choice,
+            'last_update': datetime.utcnow()
+        }
+
+        save_metadata(entry)
+
+    # yt-dlp options
     ydl_opts = {
         'progress_hooks': [hook],
         'ffmpeg_location': FFMPEG_PATH,
-        'outtmpl': os.path.join(DOWNLOAD_DIR, f'{uuid}.%(ext)s'),
         'quiet': True,
-        'noplaylist' : noplaylist
+        'outtmpl': os.path.join(DOWNLOAD_DIR, '%(id).100s.%(ext)s')
     }
 
+    # Playlist toggle
+    if noplaylist:
+        ydl_opts['no-playlist'] = True
+    else:
+        ydl_opts['yes-playlist'] = True
+
+    # Format handling
     if format_choice == 'mp3':
         ydl_opts['format'] = 'bestaudio/best'
         ydl_opts['postprocessors'] = [{
@@ -526,13 +521,17 @@ def download_video(url, format_choice, noplaylist):
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
     except Exception as e:
-        progress_data[entry_index]['status'] = 'error'
-        progress_data[entry_index]['progress'] = 0
-        progress_data[entry_index]['filename'] = str(e)
-        progress_data[entry_index]['last_update'] = datetime.utcnow()
-    finally:
-        save_metadata(progress_data[entry_index])
-                  
+        entry = {
+            'uuid': f"error_{datetime.utcnow().timestamp()}",
+            'status': 'error',
+            'progress': 0,
+            'filename': str(e),
+            'title': '',
+            'format': format_choice,
+            'last_update': datetime.utcnow()
+        }
+        save_metadata(entry)
+                        
 def sanitize_filename(title):
     title = unicodedata.normalize('NFKD', title)
     title = re.sub(r'[\\/*?:"<>|]', '_', title)  # Rimuove i caratteri vietati su Windows

@@ -18,9 +18,9 @@ StefyTube.exe
 logs/
 
 # Cartelle dati locali
-downloads/
-track-playlist/
-video-playlist/
+downloads/*.json
+track-playlist/*.json
+video-playlist/*.json
 
 
 # Icone, binari extra
