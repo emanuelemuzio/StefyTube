@@ -19,7 +19,9 @@ logs/
 
 # Cartelle dati locali
 downloads/
-playlist/
+track-playlist/
+video-playlist/
+
 
 # Icone, binari extra
 ffmpeg.exe

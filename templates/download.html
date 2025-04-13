@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+{% import 'macros.html' as macros %}
+
+{{ macros.head() }}
+
+<body>
+  {{ macros.navbar() }}
+  <div class="container-lg mt-5">
+    {{ macros.logo() }}
+    {{ macros.downloadForm() }}
+    {{ macros.downloadStatus() }}
+    <div class="mt-3" id="statusMessage"></div>
+  </div>
+  <script src="{{ url_for('static', filename='download.js') }}"></script>
+</body>
+
+</html>
