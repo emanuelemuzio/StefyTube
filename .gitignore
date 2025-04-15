@@ -21,7 +21,8 @@ logs/
 downloads/*.json
 track-playlist/*.json
 video-playlist/*.json
-
+*.mp3
+*.mp4
 
 # Icone, binari extra
 ffmpeg.exe

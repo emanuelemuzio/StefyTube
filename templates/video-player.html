@@ -3,75 +3,31 @@
 
 {% import 'macros.html' as macros %}
 
-<head>
-  <title>StefyTube</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
-</head>
+{{ macros.head() }}
 
 <body>
   {{ macros.navbar() }}
 
-  <div class="container mt-4">
-
-    <div id="liveProgressBlock">
-      {% for p in progress if p.status != 'finished' %}
-      <div class="alert alert-info text-center">
-        Download in corso: <strong>{{ p.filename }}</strong> ({{ p.progress }}%)
+  <div class="container-fluid mt-4">
+    <div class="row">
+      <!-- Video Player principale -->
+      <div class="col-lg-8 mb-4">
+        <video id="mainVideo" class="w-100 rounded shadow" controls>
+          <source id="mainSource" src="" type="video/mp4">
+          Il tuo browser non supporta il tag video.
+        </video>
+        <div class="mt-2 fw-bold text-white" id="currentVideoLabel"></div>
       </div>
-      {% endfor %}
+
+      <!-- Lista a destra -->
+      <div class="col-lg-4">
+        <h5 class="text-white">Video scaricati</h5>
+        <ul class="list-group" id="videoList"></ul>
+      </div>
     </div>
-
-    <h3 class="mb-4">🎥 Video scaricati</h3>
-
-    {% if progress.status != 'idle' and progress.status != 'finished' %}
-    <div class="alert alert-info text-center">
-      ⏳ Download video in corso: <strong>{{ progress.filename }}</strong> ({{ progress.progress }}%)
-    </div>
-    {% endif %}
-
-
-    {% if videos %}
-    {% for video in videos %}
-    <div class="video-wrapper">
-      <h5>{{ video }}</h5>
-      <video controls>
-        <source src="{{ url_for('download_file', filename=video) }}" type="video/mp4">
-        Il tuo browser non supporta il tag video.
-      </video>
-    </div>
-    {% endfor %}
-    {% else %}
-    <div class="alert alert-info">Non ci sono video disponibili nella cartella downloads.</div>
-    {% endif %}
   </div>
-
-  <script>
-    function updateLiveProgressBlock() {
-      const block = document.getElementById('liveProgressBlock');
-      if (!block) return;
-
-      fetch('/progress')
-        .then(res => res.json())
-        .then(data => {
-          const active = data.filter(p => p.status !== 'finished' && p.format === 'mp4');
-          if (!active.length) {
-            block.innerHTML = '';
-            return;
-          }
-
-          block.innerHTML = active.map(p => `
-            <div class="alert alert-info text-center">
-              ⏳ Download in corso: <strong>${p.filename || '(in preparazione...)'}</strong> (${p.progress}%)
-            </div>
-          `).join('');
-        });
-    }
-
-    // Avvia aggiornamento periodico
-    setInterval(updateLiveProgressBlock, 3000);
-    updateLiveProgressBlock();
-  </script>
+  {{ macros.videoPlaylistModal() }}
+  <script src="{{ url_for('static', filename='video-player.js') }}"></script>
 </body>
 
 </html>

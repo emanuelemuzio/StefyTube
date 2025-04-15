@@ -103,6 +103,10 @@ def playlist_view():
     
     return render_template('playlist-view.html')
 
+@app.route('/video-player')
+def video_player():  
+    return render_template('video-player.html')
+
 # === API Generiche ===
 
 @app.post('/api/start-download')
@@ -419,18 +423,63 @@ def add_to_playlist():
 
     return jsonify({'message': "Operazione effettuata con successo"}), 200
 
-@app.route('/video-player')
-def video_player():
-    videos = []
-    for f in os.listdir(DOWNLOAD_DIR):
-        if f.endswith('.mp4'):
-            full_path = os.path.join(DOWNLOAD_DIR, f)
-            if os.path.isfile(full_path) and os.path.getsize(full_path) > 0:
-                # Escludi file ancora in download
-                if not any(d['filename'] == f and d['status'] != 'finished' for d in progress_data):
-                    videos.append(f)
+@app.post('/api/video-playlist/add')
+def add_to_playlist_video():
+    data = request.json
+    playlist = data.get('playlist')
+    video = data.get('video')
+    
+    if not playlist or not video:
+        return jsonify({'message': 'Parametri mancanti'}), 400
 
-    return render_template('video_player.html', videos=videos, progress=progress_data)
+    path = os.path.join(VIDEO_PLAYLIST_DIR, f'{playlist}.json')
+    
+    if not os.path.exists(path):
+        return jsonify({'message': 'Playlist non trovata'}), 404
+
+    with open(path, 'r') as f:
+        content = json.load(f)
+
+    if video not in content['video']:
+        content['video'].append(video)
+        with open(path, 'w') as f:
+            json.dump(content, f)
+
+    return jsonify({'message': "Operazione effettuata con successo"}), 200
+
+@app.route('/api/video-player-data')
+def video_player_data():
+    data = {
+        'videos' : [],
+        'playlists' : []
+    }
+    
+    try:
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+            if isinstance(metadata, dict):
+                for uuid in metadata.keys():
+                    if metadata[uuid]['format'] == 'mp4' and metadata[uuid]['status'] == 'finished':
+                        metadata[uuid]['uuid'] = uuid
+                        data['videos'].append(metadata[uuid]) 
+            else:
+                data['videos'] = []
+    except Exception:
+        print('Unreadable file')
+        
+    for f in os.listdir(VIDEO_PLAYLIST_DIR):
+        if f.endswith('.json'):
+            playlist_uuid = os.path.splitext(f)[0]
+            playlist_path = os.path.join(VIDEO_PLAYLIST_DIR, f)
+            with open(playlist_path, 'r', encoding='utf-8') as plfile:
+                playlist_ = json.load(plfile)
+                playlist_['uuid'] = playlist_uuid
+                data['playlists'].append(playlist_)
+
+    return jsonify({
+        'message': 'Dati pagina video player recuperati',  
+        'data' : data
+    }), 200
 
 # === Avvio ===
 def start_flask():
@@ -464,38 +513,62 @@ def save_metadata(entry):
     # Sovrascrivi il file
     with open(metadata_path, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
+        
+def update_progress(entry):
+    progress_data[-1] = entry 
 
 def download_video(url, format_choice, noplaylist):
+    
+    entry = {
+        'uuid': f"{datetime.utcnow().timestamp()}_{format_choice}",
+        'status': 'starting',
+        'progress': 0,
+        'filename': '',
+        'title': '',
+        'format': format_choice,
+        'last_update': datetime.utcnow()
+    }
+    progress_data.append(entry)
+    
     def hook(d):
         if d['status'] != 'finished':
+            info = d['info_dict']  
+            progress_data[-1]['title'] = info.get('title', 'video')
+            
+            total = d.get('total_bytes') or d.get('total_bytes_estimate')
+            downloaded = d.get('downloaded_bytes', 0)
+            if total:
+                progress_data[-1]['progress'] = int(downloaded / total * 100)
+            progress_data[-1]['status'] = 'downloading'
             return
-
+        
         info = d['info_dict']
+        title = sanitize_filename(info.get('title', 'video'))
+
         video_id = info.get('id')
         if not video_id:
             return
 
-        title = sanitize_filename(info.get('title', 'video'))
         ext = 'mp3' if format_choice == 'mp3' else 'mp4'
         filename = f"{video_id}.{ext}"
 
-        entry = {
-            'uuid': video_id,   
+        progress_data[-1].update({
+            'uuid': video_id,
             'status': 'finished',
             'progress': 100,
             'filename': filename,
             'title': title,
             'format': format_choice,
             'last_update': datetime.utcnow()
-        }
+        })
 
-        save_metadata(entry)
+        save_metadata(progress_data[-1])
 
     # yt-dlp options
     ydl_opts = {
         'progress_hooks': [hook],
-        'ffmpeg_location': FFMPEG_PATH,
-        'quiet': True,
+        'ffmpeg_location': FFMPEG_PATH, 
+        'quiet' : True,
         'outtmpl': os.path.join(DOWNLOAD_DIR, '%(id).100s.%(ext)s')
     }
 
@@ -521,6 +594,7 @@ def download_video(url, format_choice, noplaylist):
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
     except Exception as e:
+        print(str(e))
         entry = {
             'uuid': f"error_{datetime.utcnow().timestamp()}",
             'status': 'error',

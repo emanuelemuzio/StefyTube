@@ -96,7 +96,7 @@ audio {
 
 video {
     width: 100%;
-    max-width: 800px;
+    max-width: 950px;
     height: auto;
     border-radius: 10px;
     box-shadow: 0 0 10px #111;
@@ -112,6 +112,10 @@ video {
     background-color: #212529 !important;
     border-left: 4px solid #0dcaf0;
     animation: pulse 1.5s infinite;
+}
+
+.video-player {
+    display: block;
 }
 
 @keyframes pulse {

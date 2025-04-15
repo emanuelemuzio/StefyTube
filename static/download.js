@@ -1,20 +1,20 @@
 let lastStartedDownload = null;
-const playlistSelect = document.getElementById('noplaylistSelect') 
+const playlistSelect = document.getElementById('noplaylistSelect')
 const urlInput = document.getElementById('linkInput');
 
 urlInput.addEventListener('input', () => {
     const url = urlInput.value;
     const fullOption = playlistSelect.querySelector('option[value="false"]');
     const isPlaylist = url.includes('list=');
-  
+
     // Abilita/disabilita opzione "scarica playlist"
     fullOption.disabled = !isPlaylist;
-  
+
     // Se l'opzione è disabilitata ed è selezionata, forza il valore su "true"
-    if (!isPlaylist && playlistSelect.value === 'false') {
-      playlistSelect.value = 'true';
+    if (!isPlaylist && playlistSelect.value === 'true') {
+        playlistSelect.value = 'true';
     }
-  });
+});
 
 
 $('#downloadForm').on('submit', function (e) {
@@ -37,7 +37,6 @@ $('#downloadForm').on('submit', function (e) {
         })
     })
         .then(() => {
-            alert("Download avviato!")
             lastStartedDownload = { format: formatSelected };  // usa per filtrare i progressi
         });
 });
@@ -56,22 +55,32 @@ function updateDownloadStatus() {
         .then(res => res.json())
         .then(data => {
             const container = document.getElementById('downloadStatus');
-            if (!data.length) {
+            if (!container) return;
+
+            // Filtra solo download non completati
+            const active = data.filter(d => d.status !== 'finished' && d.progress < 100);
+
+            if (!active.length) {
                 container.innerHTML = '';
                 return;
             }
 
-            container.innerHTML = '<h5 class="mb-2">⏳ Download in corso:</h5>' + data.map(d =>
+            container.innerHTML = '<h5 class="mb-2">⏳ Download in corso:</h5>' + active.map(d =>
                 `<div class="mb-2 p-2 bg-dark text-light rounded">
-              <strong>${d.title || '(in preparazione...)'}</strong><br>
-              Stato: ${d.status} – ${d.progress}%
-              <div class="progress mt-1" style="height: 8px;">
-                <div class="progress-bar" style="background-color: #d71612; width: ${d.progress}%"></div>
-              </div>
-            </div>`
+            <strong>${d.title || '(in preparazione...)'}</strong><br>
+            Formato: ${d.format?.toUpperCase() || 'N/D'}<br>
+            Stato: ${d.status} – ${d.progress}%
+            <div class="progress mt-1" style="height: 8px;">
+              <div class="progress-bar" style="background-color: #d71612; width: ${d.progress}%"></div>
+            </div>
+          </div>`
             ).join('');
+        })
+        .catch(err => {
+            console.error('Errore durante il fetch dei progressi:', err);
         });
 }
 
+
 setInterval(updateDownloadStatus, 500);
-updateDownloadStatus();
+// updateDownloadStatus();

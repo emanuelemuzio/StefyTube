@@ -59,8 +59,8 @@
         </div>
         <div class="col-auto">
             <select id="noplaylistSelect" class="form-select bg-dark text-white border-secondary" required>
-                <option value="false" selected>Scarica solo questo video</option>
-                <option value="true">Scarica l'intera playlist</option>
+                <option value="true" selected>Scarica solo questo video</option>
+                <option value="false">Scarica l'intera playlist</option>
             </select>
         </div>
         <div class="col-auto">
@@ -131,6 +131,30 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
                 <button type="button" class="btn btn-success" onclick="confirmAddToPlaylist()">Aggiungi</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro videoPlaylistModal() %}
+<div class="modal fade" id="playlistModal" tabindex="-1" aria-labelledby="playlistModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="playlistModalLabel">Aggiungi a una playlist</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>Video: </strong> <span id="modalVideoName" class="text-warning"></span></p>
+                <select id="playlistSelect" class="form-select bg-dark text-white">
+                    <option selected disabled>Scegli una playlist...</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-success" onclick="confirmAddToVideoPlaylist()">Aggiungi</button>
             </div>
         </div>
     </div>
