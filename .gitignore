@@ -1,3 +1,5 @@
+ffmpeg.exe
+
 # Bytecode e cache Python
 __pycache__/
 *.pyc
