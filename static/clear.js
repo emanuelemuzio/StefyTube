@@ -1,4 +1,4 @@
 
 const clearProgressData = () => fetch('/api/clear')
-setInterval(clearProgressData, 1000);
+setInterval(clearProgressData, 2000);
 clearProgressData();

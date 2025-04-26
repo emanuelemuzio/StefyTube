@@ -78,7 +78,8 @@ function loadVideos() {
 function playVideo(videoElement) {
     const video = document.getElementById('mainVideo');
     const source = document.getElementById('mainSource');
-    source.src = `/api/downloads/${videoElement.filename}`;
+    const video_uuid = videoElement.uuid;
+    source.src = `/api/downloads/${video_uuid}`;
     video.load();
     video.play();
 

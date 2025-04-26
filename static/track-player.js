@@ -88,11 +88,12 @@ function playTrack(index) {
         return;
     }
 
-    const activeIndex = trackList.indexOf(shuffleTrackList[index])
+    const activeIndex = shuffle ? trackList.indexOf(shuffleTrackList[index]) : index
     const track = shuffle ? shuffleTrackList[index] : trackList[index]
     const filename = track.filename;
     const title = track.title;
-    source.src = `/api/downloads/${filename}`;
+    const track_uuid = track.uuid;
+    source.src = `/api/downloads/${track_uuid}`;
     audio.load();
     audio.play();
 
@@ -224,7 +225,7 @@ function fetchFiles() {
             alertBox.classList.add('d-none');
 
             trackList.forEach((track, index) => {
-                uuid = track.filename.slice(0, -4)
+                uuid = track.uuid
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center';
                 li.id = `item-${index + 1}`;

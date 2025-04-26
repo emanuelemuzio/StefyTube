@@ -18,15 +18,13 @@ StefyTube.exe
 logs/
 
 # Cartelle dati locali
-downloads/*.json
+downloads
 track-playlist/*.json
 video-playlist/*.json
 *.mp3
 *.mp4
-
-# Icone, binari extra
-ffmpeg.exe
-icon.ico
+*.webm
+*.part
 
 # Cartelle IDE/editor
 .vscode/

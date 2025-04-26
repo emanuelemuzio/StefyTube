@@ -52,7 +52,7 @@ function fetchPlaylists() {
           li.className = 'list-group-item bg-dark text-white d-flex justify-content-between align-items-center';
 
           li.innerHTML = `
-              <a href="/${typeValue}-playlist?id=${playlist.uuid}" class="btn btn-sm px-4" style="background-color: #d71612; color:white">
+              <a href="/${typeValue}-playlist-view?id=${playlist.uuid}" class="btn btn-sm px-4" style="background-color: #d71612; color:white">
                 ${playlist.name}
               </a>
               <div class="d-flex gap-2">

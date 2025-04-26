@@ -1,6 +1,13 @@
 let lastStartedDownload = null;
 const playlistSelect = document.getElementById('noplaylistSelect')
 const urlInput = document.getElementById('linkInput');
+const mergeContainer = document.getElementById('merge-container')
+
+playlistSelect.addEventListener('change', () => {
+    const url = urlInput.value;
+    const isPlaylist = url.includes('list=');
+    mergeContainer.style.display = isPlaylist && playlistSelect.value === 'false'  ? 'block' : 'none'
+});
 
 urlInput.addEventListener('input', () => {
     const url = urlInput.value;
@@ -22,6 +29,7 @@ $('#downloadForm').on('submit', function (e) {
 
     const formatSelected = $('#formatSelect').val();
     const url = $('input[name="url"]').val();
+    const merge = document.getElementById('merge').checked
 
     $('#statusMessage').text('');
 
@@ -33,7 +41,8 @@ $('#downloadForm').on('submit', function (e) {
         body: JSON.stringify({
             url: url,
             format: formatSelected,
-            noplaylist: playlistSelect.value === 'true'
+            noplaylist: playlistSelect.value === 'true',
+            merge : merge
         })
     })
         .then(() => {

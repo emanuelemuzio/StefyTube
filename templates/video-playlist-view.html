@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+
+{% import 'macros.html' as macros %}
+
+{{ macros.head() }}
+
+<body>
+    {{ macros.navbar() }}
+
+    <div class="container-lg mt-5">
+        {{ macros.logo() }}
+        <h2 id="playlistNameBox" class="text-center">Playlist: </h2>
+        <div id="liveProgressBlock"></div>
+
+        {{ macros.playerShuffle() }}
+
+        <ul class="list-group mb-4" id="fileList"></ul>
+        <div id="noTracksAlert" class="alert alert-info text-center d-none">
+            Playlist vuota
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='video-playlist.js') }}"></script>
+</body>
+
+</html>

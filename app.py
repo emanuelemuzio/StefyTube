@@ -2,8 +2,6 @@ import os
 import sys
 import threading
 import webview
-from flask import Flask, render_template, request, jsonify, send_from_directory
-from yt_dlp import YoutubeDL
 import json
 import subprocess
 import platform
@@ -12,6 +10,9 @@ import re
 import unicodedata
 import argparse
 import webbrowser
+import shutil
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from yt_dlp import YoutubeDL
 from uuid import uuid4
 from datetime import datetime, timedelta
 
@@ -88,20 +89,33 @@ def playlist():
     
     return render_template('playlist.html')
 
-@app.route('/playlist-view')
-def playlist_view():
+@app.route('/track-playlist-view')
+def track_playlist_view():
     
     """ 
     Rotta di dettaglio di una playlist singola.
 
     Parameters:
-        GET: /playlist-view
+        GET: /trackplaylist-view
 
     Returns:
         Render del template 'playlist-view.html'
     """
+    return render_template('track-playlist-view.html')
+
+@app.route('/video-playlist-view')
+def video_playlist_view():
     
-    return render_template('playlist-view.html')
+    """ 
+    Rotta di dettaglio di una playlist singola.
+
+    Parameters:
+        GET: /video-playlist-view
+
+    Returns:
+        Render del template 'playlist-view.html'
+    """
+    return render_template('video-playlist-view.html')
 
 @app.route('/video-player')
 def video_player():  
@@ -130,7 +144,8 @@ def start_download():
     url = data.get('url')
     format_choice = data.get('format')
     noplaylist = data.get('noplaylist')
-    threading.Thread(target=download_video, args=(url, format_choice, noplaylist)).start()
+    merge = data.get('merge')
+    threading.Thread(target=download_video, args=(url, format_choice, noplaylist, merge)).start()
     return jsonify({'message': 'Download avviato'}), 200
 
 @app.get('/api/progress')
@@ -172,14 +187,29 @@ def clear():
         message : str ["Progress data checked", "Progress data empty"]
     """
     
+    try: 
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            
+                for item in list(filter(lambda x : x['status'] == 'finished', metadata)):
+                    path = os.path.join(DOWNLOAD_DIR, f"{item['uuid']}")
+                    if os.path.exists(path):
+                        os.rename(
+                            path,
+                            os.path.join(DOWNLOAD_DIR, f"{item['filename']}")
+                        )
+    except PermissionError as e:
+        print('File is locked')
+    
     if len(progress_data) > 0:
-        clean_progress_data(timeout_sec=120)
+        clean_progress_data(timeout_sec=30)
         return jsonify({'message' : 'Progress data checked'}), 200
     else:
         return jsonify({'message' : 'Progress data empty'}), 200
     
-@app.route('/api/downloads/<filename>')
-def download_file(filename):
+@app.route('/api/downloads/<file_id>')
+def download_file(file_id):
     
     """ 
     API per il recupero del file fisico.
@@ -187,8 +217,19 @@ def download_file(filename):
     Parameters:
         GET: /api/downloads/<filename> 
     """
-    
-    return send_from_directory(DOWNLOAD_DIR, filename)
+    with open(metadata_path, 'r', encoding='utf-8') as f:
+        metadata = json.load(f)
+        filtered = list(filter(lambda x : 'uuid' in x and x['uuid'] == file_id, metadata))
+        
+        if not filtered:
+            print(f"Download fallito: file_id {file_id} non trovato nel metadata.")
+            return jsonify({'message': 'File non trovato'}), 404
+
+        file_metadata = filtered[0]
+        filename = file_metadata['filename']
+        
+        return send_from_directory(DOWNLOAD_DIR, filename)
+
 
 @app.get('/api/open-downloads')
 def open_downloads():
@@ -236,12 +277,14 @@ def track_player_data():
     try:
         with open(metadata_path, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
-            if isinstance(metadata, dict):
-                for uuid in metadata.keys():
-                    if metadata[uuid]['format'] == 'mp3':
-                        data['tracks'].append(metadata[uuid]) 
-            else:
-                data['tracks'] = []
+            if isinstance(metadata, list):
+                filtered_metadata = list(
+                    filter(
+                        lambda x : x['format'] == 'mp3' and os.path.exists(os.path.join(DOWNLOAD_DIR, x['filename'])), 
+                        metadata
+                    )
+                )
+                data['tracks'] = filtered_metadata 
     except Exception:
         print('Unreadable file')
         
@@ -267,20 +310,19 @@ def track_delete():
     if not uuid:
         return jsonify({'message': 'UUID mancante'}), 400
 
-    metadata = {}
+    metadata = []
 
     # 1. Carica in modo sicuro il metadata
     if os.path.exists(metadata_path):
         try:
             with open(metadata_path, 'r', encoding='utf-8') as f:
                 metadata = json.load(f)
-                if not isinstance(metadata, dict):
-                    metadata = {}
         except Exception:
-            metadata = {}
+            metadata = []
 
     # 2. Rimuovi la traccia se esiste
-    track = metadata.pop(uuid, None)
+    track = list(filter(lambda x : 'uuid' in x and x['uuid'] == uuid, metadata))[0]
+    metadata = list(filter(lambda x : 'uuid' in x and x['uuid'] != uuid, metadata))
     if not track:
         return jsonify({'message': 'Traccia non trovata nel metadata'}), 404
 
@@ -292,7 +334,10 @@ def track_delete():
         return jsonify({'message': f'Errore nel salvataggio del metadata: {str(e)}'}), 500
 
     # 4. Elimina il file fisico associato
-    filepath = os.path.join(DOWNLOAD_DIR, track.get('filename', ''))
+    filepath = os.path.join(DOWNLOAD_DIR, track['filename'])
+    
+    print("File path is :", filepath)
+    
     if os.path.exists(filepath):
         try:
             os.remove(filepath)
@@ -394,8 +439,7 @@ def retrieve_playlist_tracks():
         with open(metadata_path, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
             
-            for track in playlist_['track']:
-                response['tracks'].append(metadata[track])
+            response['tracks'] = list(filter(lambda x : 'uuid' in x and x['uuid'] in playlist_['track'], metadata))
                 
             return jsonify(response), 200
 
@@ -457,13 +501,14 @@ def video_player_data():
     try:
         with open(metadata_path, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
-            if isinstance(metadata, dict):
-                for uuid in metadata.keys():
-                    if metadata[uuid]['format'] == 'mp4' and metadata[uuid]['status'] == 'finished':
-                        metadata[uuid]['uuid'] = uuid
-                        data['videos'].append(metadata[uuid]) 
-            else:
-                data['videos'] = []
+            if isinstance(metadata, list):
+                filtered_metadata = list(
+                    filter(
+                        lambda x : x['format'] == 'mp4' and os.path.exists(os.path.join(DOWNLOAD_DIR, x['filename'])), 
+                        metadata
+                    )
+                )
+                data['videos'] = filtered_metadata 
     except Exception:
         print('Unreadable file')
         
@@ -487,6 +532,25 @@ def start_flask():
 
 # === Funzioni core e di utility di download ===
 
+def merge_files(input_dir, output_path, format_choice):
+    files_txt_path = os.path.join(input_dir, 'files.txt')
+    with open(files_txt_path, 'w', encoding='utf-8') as f:
+        for filename in sorted(os.listdir(input_dir)):
+            if filename.endswith(f".{format_choice}"):
+                filepath = os.path.join(input_dir, filename)
+                f.write(f"file '{filepath.replace('\\', '/')}'\n")
+    
+    command = [
+        FFMPEG_PATH,
+        '-f', 'concat',
+        '-safe', '0',
+        '-i', files_txt_path,
+        '-c', 'copy',
+        output_path
+    ]
+    
+    subprocess.run(command, check=True)
+
 def save_metadata(entry):
 
     # Carica il contenuto del file, o inizializza come dizionario vuoto
@@ -494,30 +558,33 @@ def save_metadata(entry):
         try:
             with open(metadata_path, 'r', encoding='utf-8') as f:
                 metadata = json.load(f)
-                if not isinstance(metadata, dict):
-                    metadata = {}
+                if not isinstance(metadata, list):
+                    metadata = []
         except Exception:
-            metadata = {}
+            metadata = []
     else:
-        metadata = {}
+        metadata = []
+        
+    metadata_uuids = list(map(lambda x : x['uuid'], list(filter(lambda x : x['format'] == entry['format'], metadata))))
 
     # Aggiungi o aggiorna l'entry
-    metadata[str(entry['uuid'])] = {
-        'status': entry['status'],
-        'filename': entry['filename'],
-        'format': entry['format'],
-        'title': entry['title'],
-        'last_update': datetime.utcnow().isoformat()
-    }
-
-    # Sovrascrivi il file
-    with open(metadata_path, 'w', encoding='utf-8') as f:
-        json.dump(metadata, f, indent=4, ensure_ascii=False)
+    if not entry['uuid'] in metadata_uuids:
+        metadata.append({
+            'uuid' : entry['uuid'],
+            'status': entry['status'],
+            'filename': entry['filename'],
+            'format': entry['format'],
+            'title': entry['title'],
+            'last_update': datetime.utcnow().isoformat()
+        })
+        # Sovrascrivi il file
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=4, ensure_ascii=False)
         
 def update_progress(entry):
     progress_data[-1] = entry 
 
-def download_video(url, format_choice, noplaylist):
+def download_video(url, format_choice, noplaylist, merge):
     
     entry = {
         'uuid': f"{datetime.utcnow().timestamp()}_{format_choice}",
@@ -528,6 +595,7 @@ def download_video(url, format_choice, noplaylist):
         'format': format_choice,
         'last_update': datetime.utcnow()
     }
+    
     progress_data.append(entry)
     
     def hook(d):
@@ -542,35 +610,46 @@ def download_video(url, format_choice, noplaylist):
             progress_data[-1]['status'] = 'downloading'
             return
         
-        info = d['info_dict']
-        title = sanitize_filename(info.get('title', 'video'))
+        if not merge:
+        
+            info = d['info_dict']
+            title = sanitize_filename(info.get('title', 'video'))
 
-        video_id = info.get('id')
-        if not video_id:
-            return
+            ext = 'mp3' if format_choice == 'mp3' else 'mp4'
+            filename = f"{title}.{ext}"
+            video_id = f"{info.get('id')}.{ext}"
+            if not video_id:
+                return
+            
+            progress_data[-1].update({
+                'uuid': video_id,
+                'status': 'finished',
+                'progress': 100,
+                'filename': filename,
+                'title': title,
+                'format': format_choice,
+                'last_update': datetime.utcnow()
+            })
 
-        ext = 'mp3' if format_choice == 'mp3' else 'mp4'
-        filename = f"{video_id}.{ext}"
-
-        progress_data[-1].update({
-            'uuid': video_id,
-            'status': 'finished',
-            'progress': 100,
-            'filename': filename,
-            'title': title,
-            'format': format_choice,
-            'last_update': datetime.utcnow()
-        })
-
-        save_metadata(progress_data[-1])
-
-    # yt-dlp options
+            save_metadata(progress_data[-1])
+        
     ydl_opts = {
+        'retries': 10,
+        'fragment_retries': 10,
+        'http_chunksize': 10485760,
+        'nocheckcertificate': True,
         'progress_hooks': [hook],
         'ffmpeg_location': FFMPEG_PATH, 
         'quiet' : True,
-        'outtmpl': os.path.join(DOWNLOAD_DIR, '%(id).100s.%(ext)s')
     }
+
+    # yt-dlp options
+    if merge:
+        temp_dir = os.path.join(DOWNLOAD_DIR, f"temp_{uuid4()}")
+        os.makedirs(temp_dir, exist_ok=True)
+        ydl_opts['outtmpl'] = os.path.join(temp_dir, '%(playlist_index)03d_%(id)s.%(ext)s')
+    else:
+        ydl_opts['outtmpl'] = os.path.join(DOWNLOAD_DIR, '%(id).100s.%(ext)s')
 
     # Playlist toggle
     if noplaylist:
@@ -593,6 +672,33 @@ def download_video(url, format_choice, noplaylist):
     try:
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+            
+            if merge and temp_dir:
+                title = sanitize_filename(progress_data[-1]['title'] or 'playlist')
+                ext = 'mp3' if format_choice == 'mp3' else 'mp4'
+                final_filename = f"{title}_unito.{ext}"
+                final_path = os.path.join(DOWNLOAD_DIR, final_filename)
+
+                # Unisci i file
+                merge_files(temp_dir, final_path, format_choice)
+
+                # Aggiorna progress e metadata
+                playlist_uuid = f"playlist_{datetime.utcnow().timestamp()}_{format_choice}"
+                progress_data[-1].update({
+                    'uuid': playlist_uuid,
+                    'status': 'finished',
+                    'progress': 100,
+                    'filename': final_filename,
+                    'title': title,
+                    'format': format_choice,
+                    'last_update': datetime.utcnow()
+                })
+
+                save_metadata(progress_data[-1])
+
+                # Pulizia della temp dir
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            
     except Exception as e:
         print(str(e))
         entry = {
@@ -634,11 +740,10 @@ if __name__ == '__main__':
         webview.create_window(APP_NAME, BASE_URL, width=screen.width, height=screen.height)
         webview.start()
     else:
-    #     # modalità browser 
+        # modalità browser 
         # webbrowser.open(BASE_URL)
         print("Server attivo. Premi Invio per terminare...")
         input()
-
 
 # Chiudi log
 sys.stdout.close()

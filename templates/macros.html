@@ -48,7 +48,8 @@
 {% macro downloadForm() %}
 <form id="downloadForm" method="POST">
     <div class="mb-3">
-        <input id="linkInput" type="text" name="url" class="form-control" placeholder="Incolla il link di YouTube" required>
+        <input id="linkInput" type="text" name="url" class="form-control" placeholder="Incolla il link di YouTube"
+            required>
     </div>
     <div class="row justify-content-center mb-3">
         <div class="col-auto">
@@ -62,6 +63,12 @@
                 <option value="true" selected>Scarica solo questo video</option>
                 <option value="false">Scarica l'intera playlist</option>
             </select>
+        </div>
+        <div class="col-auto form-check bg-dark text-white border-secondary" id="merge-container" style="display: none">
+            <label class="form-check-label">
+                <input type="checkbox" id="merge" name="merge" class="form-check-input">
+                <span>Unisci playlist in un unico file</span>
+            </label>
         </div>
         <div class="col-auto">
             <button type="submit" class="btn btn-primary">Scarica</button>
