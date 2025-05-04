@@ -1,8 +1,10 @@
 let trackList = [];
 let shuffleTrackList = [];
-let currentTrackIndex = 0;
-let currentShuffleIndex = 0;
+let currentTrackIndex = -1;
+let currentShuffleIndex = -1;
 let shuffle = false;
+let selectedTrackUuid = '';
+
 const params = new URLSearchParams(window.location.search);
 const id = params.get('id');
 const type = params.get('type');
@@ -19,7 +21,7 @@ function shuffleTracks(originalArray) {
         [array[currentIndex], array[randomIndex]] = [
             array[randomIndex], array[currentIndex]
         ];
-    }
+    } 
 
     return array;
 }
@@ -27,22 +29,20 @@ function shuffleTracks(originalArray) {
 
 function playTrack(index) {
 
-    if (shuffle) {
-        currentTrackIndex = index;
-    }
-    else {
-        currentShuffleIndex = index
-    }
+    currentTrackIndex = index;
+    currentShuffleIndex = index;
 
     const audio = document.getElementById('audioPlayer');
     const source = document.getElementById('audioSource');
     const nowPlaying = document.getElementById('nowPlaying');
 
-    if (index < 0 || index >= trackList.length) {
-        audio.pause();
-        return;
+    if (index < 0 || index >= trackList.length || index >= shuffleTrackList.length) {
+        index = 0;
+        currentTrackIndex = 0;
+        currentShuffleIndex = 0;
     }
 
+    const activeIndex = shuffle ? trackList.indexOf(shuffleTrackList[index]) : index
     const track = shuffle ? shuffleTrackList[index] : trackList[index]
     const filename = track.filename;
     const title = track.title;
@@ -51,8 +51,18 @@ function playTrack(index) {
     audio.load();
     audio.play();
 
+    document.querySelectorAll('.track-active').forEach(el => {
+        el.classList.remove('track-active');
+    });
+
+    // Aggiungi highlight a quello in riproduzione
+    const activeItem = document.getElementById(`item-${activeIndex + 1}`);
+    if (activeItem) {
+        activeItem.classList.add('track-active');
+    }
+
     audio.hidden = false;
-    nowPlaying.innerText = `In riproduzione: ${title}`;
+    nowPlaying.textContent = `In riproduzione: ${title}`;
 }
 
 function nextTrack() {
@@ -76,25 +86,15 @@ function prevTrack() {
 }
 
 function toggleShuffle() {
-    const audio = document.getElementById('audioPlayer');
-    const source = document.getElementById('audioSource');
     const btn = document.getElementById('shuffleBtn');
     shuffle = !shuffle;
 
     if (shuffle) {
-        btn.innerHTML = '🔀 Riproduzione casuale <span class="badge bg-success ms-2">ATTIVA</span>';
-        if (source.src.includes('mp3')) {
-            audio.play();
-        }
-        else {
-            document.getElementById('controlsRow').style.display = 'flex';
-            playTrack(currentShuffleIndex);
-        }
+        btn.innerHTML = '🔀 Riproduzione casuale <span class="badge bg-success ms-2">ATTIVA</span>'; 
+        document.getElementById('controlsRow').style.display = 'flex';
     } else {
         btn.innerHTML = '🔀 Riproduzione casuale';
-        audio.pause();
     }
-
 }
 
 function deleteFile(uuid, index) {

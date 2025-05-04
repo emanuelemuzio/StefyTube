@@ -64,7 +64,7 @@ function loadVideos() {
                 const button = document.createElement('button');
                 button.className = 'btn btn-sm';
                 button.style = "background-color: #d71612; color:white"
-                button.innerHTML = `<button onclick="openVideoPlaylistModal('${videoElement.title}','${videoElement.uuid}')">Aggiungi a playlist</button>`;
+                button.innerHTML = `<button class="btn btn-sm" style="background-color: #d71612; color:white" onclick="openVideoPlaylistModal('${videoElement.title}','${videoElement.uuid}')">Aggiungi a playlist</button>`;
 
                 li.appendChild(titleSpan);
                 li.appendChild(button);

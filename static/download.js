@@ -6,7 +6,8 @@ const mergeContainer = document.getElementById('merge-container')
 playlistSelect.addEventListener('change', () => {
     const url = urlInput.value;
     const isPlaylist = url.includes('list=');
-    mergeContainer.style.display = isPlaylist && playlistSelect.value === 'false'  ? 'block' : 'none'
+    // mergeContainer.style.display = isPlaylist && playlistSelect.value === 'false'  ? 'block' : 'none'
+    mergeContainer.style.display = 'none'
 });
 
 urlInput.addEventListener('input', () => {

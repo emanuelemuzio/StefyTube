@@ -83,9 +83,10 @@ function playTrack(index) {
     const source = document.getElementById('audioSource');
     const nowPlaying = document.getElementById('nowPlaying');
 
-    if (index < 0 || index >= trackList.length) {
-        audio.pause();
-        return;
+    if (index < 0 || index >= trackList.length || index >= shuffleTrackList.length) {
+        index = 0;
+        currentTrackIndex = 0;
+        currentShuffleIndex = 0;
     }
 
     const activeIndex = shuffle ? trackList.indexOf(shuffleTrackList[index]) : index
@@ -132,25 +133,15 @@ function prevTrack() {
 }
 
 function toggleShuffle() {
-    const audio = document.getElementById('audioPlayer');
-    const source = document.getElementById('audioSource');
     const btn = document.getElementById('shuffleBtn');
     shuffle = !shuffle;
 
     if (shuffle) {
-        btn.innerHTML = '🔀 Riproduzione casuale <span class="badge bg-success ms-2">ATTIVA</span>';
-        if (source.src.includes('mp3')) {
-            audio.play();
-        }
-        else {
-            document.getElementById('controlsRow').style.display = 'flex';
-            playTrack(currentShuffleIndex);
-        }
+        btn.innerHTML = '🔀 Riproduzione casuale <span class="badge bg-success ms-2">ATTIVA</span>'; 
+        document.getElementById('controlsRow').style.display = 'flex';
     } else {
         btn.innerHTML = '🔀 Riproduzione casuale';
-        audio.pause();
     }
-
 }
 
 function deleteFile(uuid, index) {

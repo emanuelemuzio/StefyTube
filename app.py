@@ -33,6 +33,10 @@ os.makedirs(TRACK_PLAYLIST_DIR, exist_ok=True)
 os.makedirs(VIDEO_PLAYLIST_DIR, exist_ok=True)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+if not os.path.exists(metadata_path):
+    with open(metadata_path, 'w', encoding='utf-8') as f:
+        json.dump([], f, indent=4, ensure_ascii=False)
+
 # === Logging su file ===
 log_path = 'log.log'
 sys.stdout = open(log_path, 'w')
@@ -192,7 +196,7 @@ def clear():
                 metadata = json.load(f)
             
                 for item in list(filter(lambda x : x['status'] == 'finished', metadata)):
-                    path = os.path.join(DOWNLOAD_DIR, f"{item['uuid']}")
+                    path = os.path.join(DOWNLOAD_DIR, f"{item['uuid']}.{item['format']}")
                     if os.path.exists(path):
                         os.rename(
                             path,
@@ -438,7 +442,7 @@ def retrieve_playlist_tracks():
         with open(metadata_path, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
             
-            response['tracks'] = list(filter(lambda x : 'uuid' in x and x['uuid'] in playlist_['track'], metadata))
+            response['tracks'] = list(filter(lambda x : 'uuid' in x and x['uuid'] in playlist_['track'] and x['format'] == 'mp3', metadata))
                 
             return jsonify(response), 200
 
@@ -500,14 +504,13 @@ def video_player_data():
     try:
         with open(metadata_path, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
-            if isinstance(metadata, list):
-                filtered_metadata = list(
-                    filter(
-                        lambda x : x['format'] == 'mp4' and os.path.exists(os.path.join(DOWNLOAD_DIR, x['filename'])), 
-                        metadata
-                    )
+            filtered_metadata = list(
+                filter(
+                    lambda x : x['format'] == 'mp4' and os.path.exists(os.path.join(DOWNLOAD_DIR, x['filename'])), 
+                    metadata
                 )
-                data['videos'] = filtered_metadata 
+            )
+            data['videos'] = filtered_metadata 
     except Exception:
         print('Unreadable file')
         
@@ -618,7 +621,7 @@ def download_video(url, format_choice, noplaylist, merge):
 
             ext = 'mp3' if format_choice == 'mp3' else 'mp4'
             filename = f"{title}.{ext}"
-            video_id = f"{info.get('id')}.{ext}"
+            video_id = f"{info.get('id')}"
             
             if not video_id:
                 return
