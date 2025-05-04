@@ -9,7 +9,6 @@ import time
 import re
 import unicodedata
 import argparse
-import webbrowser
 import shutil
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from yt_dlp import YoutubeDL
@@ -144,7 +143,7 @@ def start_download():
     url = data.get('url')
     format_choice = data.get('format')
     noplaylist = data.get('noplaylist')
-    merge = data.get('merge')
+    merge = data.get('merge') and not noplaylist
     threading.Thread(target=download_video, args=(url, format_choice, noplaylist, merge)).start()
     return jsonify({'message': 'Download avviato'}), 200
 
@@ -538,7 +537,8 @@ def merge_files(input_dir, output_path, format_choice):
         for filename in sorted(os.listdir(input_dir)):
             if filename.endswith(f".{format_choice}"):
                 filepath = os.path.join(input_dir, filename)
-                f.write(f"file '{filepath.replace('\\', '/')}'\n")
+                filepath_fixed = filepath.replace('\\', '/')
+                f.write(f"file '{filepath_fixed}'\n")
     
     command = [
         FFMPEG_PATH,
@@ -600,6 +600,7 @@ def download_video(url, format_choice, noplaylist, merge):
     
     def hook(d):
         if d['status'] != 'finished':
+            
             info = d['info_dict']  
             progress_data[-1]['title'] = info.get('title', 'video')
             
@@ -618,6 +619,7 @@ def download_video(url, format_choice, noplaylist, merge):
             ext = 'mp3' if format_choice == 'mp3' else 'mp4'
             filename = f"{title}.{ext}"
             video_id = f"{info.get('id')}.{ext}"
+            
             if not video_id:
                 return
             
@@ -632,7 +634,7 @@ def download_video(url, format_choice, noplaylist, merge):
             })
 
             save_metadata(progress_data[-1])
-        
+            
     ydl_opts = {
         'retries': 10,
         'fragment_retries': 10,
@@ -675,43 +677,41 @@ def download_video(url, format_choice, noplaylist, merge):
             ydl.download([url])
             
             if merge and temp_dir:
-                title = sanitize_filename(progress_data[-1]['title'] or 'playlist')
+
                 ext = 'mp3' if format_choice == 'mp3' else 'mp4'
-                final_filename = f"{title}_unito.{ext}"
+                timestamp = datetime.utcnow().strftime('%d%m%y%H%M%S')
+                title = f"playlist_{timestamp}_merged"
+                final_filename = f"{title}.{ext}"
+                playlist_uuid = f"{timestamp}.{ext}"
                 final_path = os.path.join(DOWNLOAD_DIR, final_filename)
 
                 # Unisci i file
                 merge_files(temp_dir, final_path, format_choice)
-
-                # Aggiorna progress e metadata
-                playlist_uuid = f"playlist_{datetime.utcnow().timestamp()}_{format_choice}"
+                
+                # Aggiorna progress e metadata 
                 progress_data[-1].update({
                     'uuid': playlist_uuid,
                     'status': 'finished',
                     'progress': 100,
                     'filename': final_filename,
-                    'title': title,
+                    'title': final_filename,
                     'format': format_choice,
                     'last_update': datetime.utcnow()
                 })
 
                 save_metadata(progress_data[-1])
-
+                
                 # Pulizia della temp dir
-                shutil.rmtree(temp_dir, ignore_errors=True)
+                # shutil.rmtree(temp_dir, ignore_errors=True)
             
     except Exception as e:
         print(str(e))
-        entry = {
-            'uuid': f"error_{datetime.utcnow().timestamp()}",
-            'status': 'error',
-            'progress': 0,
-            'filename': str(e),
-            'title': '',
-            'format': format_choice,
-            'last_update': datetime.utcnow()
-        }
-        save_metadata(entry)
+        
+        if merge:
+            for dirname in os.listdir(DOWNLOAD_DIR):
+                dirpath = os.path.join(DOWNLOAD_DIR, dirname)
+                if os.path.isdir(dirpath) and dirname.startswith('temp'):
+                    shutil.rmtree(dirpath, ignore_errors=True)
                         
 def sanitize_filename(title):
     title = unicodedata.normalize('NFKD', title)

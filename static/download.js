@@ -29,7 +29,8 @@ $('#downloadForm').on('submit', function (e) {
 
     const formatSelected = $('#formatSelect').val();
     const url = $('input[name="url"]').val();
-    const merge = document.getElementById('merge').checked
+    // const merge = document.getElementById('merge').checked
+    const merge = false; //temp stub, can't work on post download files merge rn
 
     $('#statusMessage').text('');
 
@@ -47,6 +48,7 @@ $('#downloadForm').on('submit', function (e) {
     })
         .then(() => {
             lastStartedDownload = { format: formatSelected };  // usa per filtrare i progressi
+            urlInput.value = ''
         });
 });
 
