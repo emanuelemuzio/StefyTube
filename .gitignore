@@ -13,6 +13,7 @@ build/
 # Output build
 dist/
 StefyTubeApp/
+StefyTube/
 StefyTube.exe
 
 # File di log

@@ -643,6 +643,7 @@ def download_video(url, format_choice, noplaylist, merge):
         'quiet' : True,
     }
 
+    temp_dir = None
     # yt-dlp options
     if merge:
         temp_dir = os.path.join(DOWNLOAD_DIR, f"temp_{uuid4()}")
