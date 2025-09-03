@@ -10,7 +10,7 @@
     {{ macros.logo() }}
     {{ macros.downloadForm() }}
     {{ macros.downloadStatus() }}
-    <div class="mt-3" id="downloadStatus"></div>
+    {{ macros.downloadHistory() }}
   </div>
   <script src="{{ url_for('static', filename='js/download.js') }}"></script>
 </body>

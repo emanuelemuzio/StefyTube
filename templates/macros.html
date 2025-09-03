@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/icon.ico') }}">
-    <script src="{{ url_for('static', filename='js/clear.js') }}"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 {% endmacro %}
@@ -45,6 +44,10 @@
 <div id="downloadStatus" class="mb-4"></div>
 {% endmacro %}
 
+{% macro downloadHistory() %}
+<div id="downloadHistory" class="mb-4"></div>
+{% endmacro %}
+
 {% macro downloadForm() %}
 <form id="downloadForm" method="POST">
     <div class="mb-3">
@@ -63,13 +66,7 @@
                 <option value="true" selected>Scarica solo questo video</option>
                 <option value="false">Scarica l'intera playlist</option>
             </select>
-        </div>
-        <div class="col-auto form-check bg-dark text-white border-secondary" id="merge-container" style="display: none">
-            <label class="form-check-label">
-                <input type="checkbox" id="merge" name="merge" class="form-check-input">
-                <span>Unisci playlist in un unico file</span>
-            </label>
-        </div>
+        </div> 
         <div class="col-auto">
             <button type="submit" class="btn btn-primary">Scarica</button>
         </div>

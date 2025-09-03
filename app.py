@@ -37,23 +37,20 @@ def check_queue():
                 data.save()
                 continue
 
-            # Scarico l'entry
-            service.download_entry(entry, data)
+            # Scarico l'entry (ritorna lista di entry completate)
+            completed_entries = service.download_entry(entry)
 
-            # Controllo lo stato dopo il download
-            if entry.status == "completed":
-                # rimuovo dalla queue e sposto in history
+            # Rimuovo l'entry originale dalla queue
+            if entry in data.queue:
                 data.queue.remove(entry)
-                data.move_to_history(entry)
-                data.save()
-            elif entry.status == "failed":
-                # rimuovo dalla queue e sposto in history
-                data.queue.remove(entry)
-                data.move_to_history(entry)
-                data.save()
+
+            # Aggiungo tutte le entry completate in history
+            for e in completed_entries:
+                data.move_to_history(e)
+
+            data.save()
 
         time.sleep(2)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

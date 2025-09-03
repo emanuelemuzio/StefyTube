@@ -18,7 +18,9 @@ class Service:
         entry = Entry(url=request.url, format=request.format, noplaylist=request.noplaylist)
         data.add_to_queue(entry)
 
-    def download_entry(self, entry: Entry, data: Data, save_path="data.json"): 
+    def download_entry(self, entry: Entry): 
+        completed_entries = []
+
         def hook(d): 
             if d["status"] == "downloading": 
                 total = d.get("total_bytes") or d.get("total_bytes_estimate") 
@@ -26,12 +28,10 @@ class Service:
                 if total: 
                     entry.progress = int(downloaded / total * 100) 
                     entry.status = "downloading" 
-                    data.save(save_path) 
             elif d["status"] == "finished": 
                 entry.status = "completed" 
                 # aggiorna il filepath con quello effettivo dopo conversione 
                 entry.filepath = d.get("filename") or entry.filepath 
-                data.save(save_path) 
 
         outtmpl = os.path.join(self.config.DOWNLOAD_DIR, "%(title)s.%(ext)s")
 
@@ -49,7 +49,8 @@ class Service:
                     hook
                 ], 
                 "quiet": True, 
-                "outtmpl" : outtmpl
+                "outtmpl" : outtmpl,
+                "noplaylist": entry.noplaylist
             } 
         else: 
             # mp4 
@@ -62,18 +63,38 @@ class Service:
                 "quiet": True, 
                 "outtmpl" : outtmpl, 
             } 
-        try: 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl: 
-                info = ydl.extract_info(entry.url, download=True) 
-                entry.id = info.get("id") 
-                entry.title = info.get("title") 
-                # filepath finale corretto 
-                entry.filepath = ydl.prepare_filename(info) 
-                if entry.format == "mp3": 
-                    # cambia estensione in .mp3 
-                    entry.filepath = os.path.splitext(entry.filepath)[0] + ".mp3"
-        except Exception: 
-            entry.status = "failed"  
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(entry.url, download=True)
+
+                # playlist o singolo video
+                if "entries" in info:
+                    for video_info in info["entries"]:
+                        e = Entry(
+                            id=video_info.get("id"),
+                            url=video_info.get("webpage_url"),
+                            title=video_info.get("title"),
+                            filepath=ydl.prepare_filename(video_info),
+                            format=entry.format,
+                            status="completed"
+                        )
+                        if entry.format == "mp3":
+                            e.filepath = os.path.splitext(e.filepath)[0] + ".mp3"
+                        completed_entries.append(e)
+                else:
+                    entry.id = info.get("id")
+                    entry.title = info.get("title")
+                    entry.filepath = ydl.prepare_filename(info)
+                    if entry.format == "mp3":
+                        entry.filepath = os.path.splitext(entry.filepath)[0] + ".mp3"
+                    entry.status = "completed"
+                    completed_entries.append(entry)
+
+        except Exception:
+            entry.status = "failed"
+            completed_entries.append(entry)
+
+        return completed_entries
 
     def retrieve_history(self, data):
         history_list = [e.dict() for e in data.history]
