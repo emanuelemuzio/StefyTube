@@ -1,4 +1,5 @@
 ffmpeg.exe
+*.json
 
 # Bytecode e cache Python
 __pycache__/

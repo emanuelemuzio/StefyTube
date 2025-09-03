@@ -23,7 +23,7 @@
   </div>
 
   {{ macros.playlistModal() }}
-  <script src="{{ url_for('static', filename='track-player.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/music.js') }}"></script>
 </body>
 
 </html>
