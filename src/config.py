@@ -3,6 +3,7 @@ import sys
 import urllib.request
 import zipfile
 import shutil
+import logging 
 
 class Config:
     def __init__(self):
@@ -21,16 +22,32 @@ class Config:
         self.DATA_PATH = os.path.join(self.BASE_DIR, 'data.json')
         self.BASE_URL = f'http://{self.host}:{self.port}'
         self.APP_NAME = 'StefyTube'
+        self.LOG_PATH = 'log.log'
 
         # === Crea le cartelle se non esistono ===
 
         os.makedirs(self.DOWNLOAD_DIR, exist_ok=True)
 
-        # === Logging su file ===
+        # === Logging ===
+
+        self.logger = logging.getLogger('werkzeug')  # logger delle richieste HTTP
+        self.logger.setLevel(logging.INFO)
+
+        # Handler per il terminale (console)
+        self.console_handler = logging.StreamHandler()
+        self.console_handler.setLevel(logging.INFO)
+        self.console_formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
+        self.console_handler.setFormatter(self.console_formatter)
         
-        self.log_path = 'log.log'
-        sys.stdout = open(self.log_path, 'w')
-        sys.stderr = open(self.log_path, 'w')
+        # Handler per il file
+        self.file_handler = logging.FileHandler(self.LOG_PATH)
+        self.file_handler.setLevel(logging.INFO)
+        self.file_formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
+        self.file_handler.setFormatter(self.file_formatter)
+
+        # Aggiungi gli handler al logger
+        self.logger.addHandler(self.console_handler)
+        self.logger.addHandler(self.file_handler)
 
         # === ffmpeg.exe Dependency
         
@@ -42,8 +59,8 @@ class Config:
 
             ffmpeg_path = None
             for root, dirs, files in os.walk(self.FFMPEG_EXTRACT_DIR):
-                if "ffmpeg.exe" in files:
-                    ffmpeg_path = os.path.join(root, "ffmpeg.exe")
+                if self.FFMPEG_PATH in files:
+                    ffmpeg_path = os.path.join(root, self.FFMPEG_PATH)
                     shutil.copy(ffmpeg_path, self.FFMPEG_PATH)
                     break
 

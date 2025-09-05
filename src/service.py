@@ -5,7 +5,7 @@ import subprocess
 from flask import jsonify
 from .config import Config
 from .data import Data, Entry, EntryResponse
-from .requests import DownloadRequest
+from .requests import DownloadRequest, HistoryDeleteRequest, QueueDeleteRequest
 
 # === Funzioni core e di utility di download ===
 
@@ -65,6 +65,7 @@ class Service:
                 ], 
                 "quiet": True, 
                 "outtmpl" : outtmpl, 
+                "noplaylist": entry.noplaylist
             } 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -99,7 +100,7 @@ class Service:
 
         return completed_entries
 
-    def retrieve_history(self, data):
+    def retrieve_history(self, data : Data):
         history_list = [EntryResponse.serializable_from_entry(e) for e in data.history]
         return history_list
     
@@ -107,7 +108,7 @@ class Service:
         queue_list = [EntryResponse.serializable_from_entry(e) for e in data.queue]
         return queue_list
     
-    def open_downloads(self):
+    def open_download_dir(self):
         download_path = os.path.join(os.getcwd(), self.config.DOWNLOAD_DIR)
 
         try:
@@ -120,3 +121,9 @@ class Service:
             return jsonify({'success': True})
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)})
+        
+    def delete_from_history(self, data : Data, request : HistoryDeleteRequest):
+        data.remove_history_entry_by_uuid(request.uuid)
+
+    def delete_from_queue(self, data : Data, request : QueueDeleteRequest):
+        data.remove_queue_entry_by_uuid(request.uuid)

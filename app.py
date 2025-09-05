@@ -10,19 +10,12 @@ config = Config()
 data = Data.load(config.DATA_PATH)
 service = Service(config=config)
 app = Flask(__name__, template_folder=config.TEMPLATE_DIR)
-router = Router(app=app, service=service, data=data)
-
-# Dependency tree: 
-# router
-#   <- app
-#       <- config
-#   <- service
-#       <- data
-#           <- config
-#       <- config
+router = Router(app=app, service=service, data=data) 
 
 # === Avvio ===
 def start_flask():
+    app.logger.addHandler(config.file_handler)
+    app.logger.addHandler(config.console_handler)
     app.run(host=config.host, port=config.port)
 
 def check_queue():

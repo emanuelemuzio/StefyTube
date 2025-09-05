@@ -33,11 +33,47 @@ class EntryResponse(BaseModel):
 class Data(BaseModel): 
     queue: List[Entry] = Field(default_factory=list) 
     history: List[Entry] = Field(default_factory=list) 
+
+    def get_history_entry_by_uuid(self, entry_uuid: str):
+        for entry in self.history:
+            if entry.uuid == entry_uuid:
+                return entry
+        return None
+    
+    def get_queue_entry_by_uuid(self, entry_uuid: str):
+        for entry in self.queue:
+            if entry.uuid == entry_uuid:
+                return entry
+        return None
     
     def remove_entry_by_uuid(self, entry_uuid: str): 
         """Rimuove un'entry dalla coda e dallo storico tramite UUID e salva lo stato.""" 
         self.queue = [e for e in self.queue if e.uuid != entry_uuid] 
         self.history = [e for e in self.history if e.uuid != entry_uuid] 
+        self.save() 
+
+    def remove_history_entry_by_uuid(self, entry_uuid: str): 
+        """Rimuove un'entry dallo storico tramite UUID e salva lo stato.""" 
+        for e in self.history:
+            if e.uuid == entry_uuid:
+                try:
+                    os.remove(e.filepath)
+                except Exception as e:
+                    print('!')
+                break
+        self.history = [e for e in self.history if e.uuid != entry_uuid] 
+        self.save() 
+
+    def remove_queue_entry_by_uuid(self, entry_uuid: str): 
+        """Rimuove un'entry dalla coda tramite UUID e salva lo stato.""" 
+        for e in self.queue:
+            if e.uuid == entry_uuid:
+                try:
+                    os.remove(e.filepath)
+                except Exception as e:
+                    print('!')
+                break
+        self.queue = [e for e in self.queue if e.uuid != entry_uuid] 
         self.save() 
         
     def move_to_history(self, entry: Entry): 
