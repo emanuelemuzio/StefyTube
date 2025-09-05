@@ -64,7 +64,7 @@ class Router:
 
         # === API Generiche ===
 
-        @app.post('/api/start-download')
+        @app.post('/api/download')
         def start_download():
             
             """ 
@@ -118,28 +118,14 @@ class Router:
                 return send_from_directory(DOWNLOAD_DIR, filename)
 
 
-        @app.get('/api/open-downloads')
+        @app.get('/api/open-download')
         def open_downloads():
             
             """ 
             API per l'apertura della cartella dei download.
-
-            Parameters:
-                GET: /api/open-downloads  
             """
             
-            download_path = os.path.join(os.getcwd(), 'downloads')
-
-            try:
-                if platform.system() == 'Windows':
-                    os.startfile(download_path)
-                elif platform.system() == 'Darwin':  # macOS
-                    subprocess.Popen(['open', download_path])
-                else:  # Linux
-                    subprocess.Popen(['xdg-open', download_path])
-                return jsonify({'success': True})
-            except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+            return service.open_downloads()
 
         # === API mp3 ===
 

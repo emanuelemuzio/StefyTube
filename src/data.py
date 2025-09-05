@@ -13,6 +13,22 @@ class Entry(BaseModel):
     status: Literal["queued", "downloading", "completed", "failed", "duplicate"] = "queued" 
     progress: Optional[int] = None # percentuale 
     format: Literal["mp4", "mp3"] = "mp3"
+    
+class EntryResponse(BaseModel):
+    uuid: Optional[str] = None
+    url: Optional[str] = None
+    title: Optional[str] = None  
+    status: Optional[str] = None 
+    progress: Optional[int] = None # percentuale 
+    format: Optional[str] = None
+    
+    @staticmethod
+    def from_entry(entry: Entry):
+        return EntryResponse(**entry.model_dump(include={"uuid", "url", "title", "status", "progress", "format"}))
+
+    @staticmethod
+    def serializable_from_entry(entry: Entry):
+        return EntryResponse(**entry.model_dump(include={"uuid", "url", "title", "status", "progress", "format"})).model_dump()
 
 class Data(BaseModel): 
     queue: List[Entry] = Field(default_factory=list) 

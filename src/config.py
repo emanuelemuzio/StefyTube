@@ -13,23 +13,17 @@ class Config:
         self.port = 5000
         self.BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
         self.TEMPLATE_DIR = os.path.join(self.BASE_DIR, 'templates')
-        self.DOWNLOAD_DIR = os.path.join(self.BASE_DIR, 'downloads')
-        self.MUSIC_DOWNLOAD_DIR = os.path.join(self.DOWNLOAD_DIR, 'music')
-        self.VIDEO_DOWNLOAD_DIR = os.path.join(self.DOWNLOAD_DIR, 'video')
+        self.DOWNLOAD_DIR = os.path.join(self.BASE_DIR, 'download')
         self.FFMPEG_PATH = os.path.join(self.BASE_DIR, 'ffmpeg.exe')
         self.FFMPEG_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
         self.FFMPEG_ZIP_PATH = os.path.join(self.BASE_DIR, 'ffmpeg.zip')
         self.FFMPEG_EXTRACT_DIR = os.path.join(self.BASE_DIR, 'ffmpeg_tmp')
-        self.TRACK_PLAYLIST_DIR = os.path.join(self.BASE_DIR, 'music-playlist') 
-        self.VIDEO_PLAYLIST_DIR = os.path.join(self.BASE_DIR, 'video-playlist') 
         self.DATA_PATH = os.path.join(self.BASE_DIR, 'data.json')
         self.BASE_URL = f'http://{self.host}:{self.port}'
         self.APP_NAME = 'StefyTube'
 
         # === Crea le cartelle se non esistono ===
 
-        os.makedirs(self.TRACK_PLAYLIST_DIR, exist_ok=True)
-        os.makedirs(self.VIDEO_PLAYLIST_DIR, exist_ok=True)
         os.makedirs(self.DOWNLOAD_DIR, exist_ok=True)
 
         # === Logging su file ===

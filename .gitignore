@@ -30,6 +30,7 @@ video-playlist/*.json
 *.mp4
 *.webm
 *.part
+*.mkv
 
 # Cartelle IDE/editor
 .vscode/

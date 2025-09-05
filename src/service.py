@@ -1,7 +1,10 @@
 import os 
 import yt_dlp
+import platform
+import subprocess
+from flask import jsonify
 from .config import Config
-from .data import Data, Entry
+from .data import Data, Entry, EntryResponse
 from .requests import DownloadRequest
 
 # === Funzioni core e di utility di download ===
@@ -97,9 +100,23 @@ class Service:
         return completed_entries
 
     def retrieve_history(self, data):
-        history_list = [e.dict() for e in data.history]
+        history_list = [EntryResponse.serializable_from_entry(e) for e in data.history]
         return history_list
     
     def retrieve_queue(self, data):
-        queue_list = [e.dict() for e in data.queue]
+        queue_list = [EntryResponse.serializable_from_entry(e) for e in data.queue]
         return queue_list
+    
+    def open_downloads(self):
+        download_path = os.path.join(os.getcwd(), self.config.DOWNLOAD_DIR)
+
+        try:
+            if platform.system() == 'Windows':
+                os.startfile(download_path)
+            elif platform.system() == 'Darwin':  # macOS
+                subprocess.Popen(['open', download_path])
+            else:  # Linux
+                subprocess.Popen(['xdg-open', download_path])
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
