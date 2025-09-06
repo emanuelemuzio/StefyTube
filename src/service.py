@@ -14,6 +14,9 @@ class Service:
     def __init__(self, config : Config):
         self.config = config
 
+    def log(self, msg : str):
+        self.config.logger.log(msg)
+
     def download_video(self, request : DownloadRequest, data : Data):
 
         entry = Entry(url=request.url, format=request.format, noplaylist=request.noplaylist)
@@ -22,17 +25,20 @@ class Service:
     def download_entry(self, entry: Entry): 
         completed_entries = []
 
-        def hook(d): 
-            if d["status"] == "downloading": 
-                total = d.get("total_bytes") or d.get("total_bytes_estimate") 
-                downloaded = d.get("downloaded_bytes", 0) 
-                if total: 
-                    entry.progress = int(downloaded / total * 100) 
-                    entry.status = "downloading" 
-            elif d["status"] == "finished": 
-                entry.status = "completed" 
-                # aggiorna il filepath con quello effettivo dopo conversione 
-                entry.filepath = d.get("filename") or entry.filepath 
+        def hook(d):
+            if d["status"] == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate")
+                downloaded = d.get("downloaded_bytes", 0)
+                if total:
+                    entry.progress = int(downloaded / total * 100)
+                    entry.status = "downloading"
+            elif d["status"] == "finished":
+                entry.status = "completed"
+                if entry.format == "mp3":
+                    # sostituisci estensione con .mp3
+                    entry.filepath = os.path.splitext(d.get("filename", entry.filepath))[0] + ".mp3"
+                else:
+                    entry.filepath = d.get("filename") or entry.filepath
 
         outtmpl = os.path.join(self.config.DOWNLOAD_DIR, "%(title)s.%(ext)s")
 
@@ -51,7 +57,8 @@ class Service:
                 ], 
                 "quiet": True, 
                 "outtmpl" : outtmpl,
-                "noplaylist": entry.noplaylist
+                "noplaylist": entry.noplaylist,
+                "ffmpeg_location": self.config.FFMPEG_PATH
             } 
         else: 
             # mp4 
@@ -63,36 +70,29 @@ class Service:
                 ], 
                 "quiet": True, 
                 "outtmpl" : outtmpl, 
-                "noplaylist": entry.noplaylist
+                "noplaylist": entry.noplaylist,
+                "ffmpeg_location": self.config.FFMPEG_PATH
             } 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(entry.url, download=True)
 
                 # playlist o singolo video
-                if "entries" in info:
-                    for video_info in info["entries"]:
-                        e = Entry(
-                            id=video_info.get("id"),
-                            url=video_info.get("webpage_url"),
-                            title=video_info.get("title"),
-                            filepath=ydl.prepare_filename(video_info),
-                            format=entry.format,
-                            status="completed"
-                        )
-                        if entry.format == "mp3":
-                            e.filepath = os.path.splitext(e.filepath)[0] + ".mp3"
-                        completed_entries.append(e)
-                else:
-                    entry.id = info.get("id")
-                    entry.title = info.get("title")
-                    entry.filepath = ydl.prepare_filename(info)
-                    if entry.format == "mp3":
-                        entry.filepath = os.path.splitext(entry.filepath)[0] + ".mp3"
-                    entry.status = "completed"
-                    completed_entries.append(entry)
+                entries_to_process = info.get("entries") or [info]
+                for video_info in entries_to_process:
+                    filepath_final = entry.filepath or video_info.get("_filename") or video_info.get("filepath") 
+                    e = Entry(
+                        id=video_info.get("id"),
+                        url=video_info.get("webpage_url", entry.url),
+                        title=video_info.get("title", entry.title),
+                        filepath=filepath_final,
+                        format=entry.format,
+                        status="completed"
+                    )
+                    completed_entries.append(e)
 
-        except Exception:
+        except Exception as e:
+            self.log(str(e))
             entry.status = "failed"
             completed_entries.append(entry)
 
@@ -144,18 +144,18 @@ class Service:
         output_format = format_check_list.pop()
         filepaths = list(map(lambda x : x.filepath, entries_to_merge))
         title = request.title
-        filename = f"{title}.{output_format}"
-        output_path = os.path.join(self.config.MERGE_DIR, filename)
+        filename = f"{title}.{output_format}"  
+        output_path = os.path.join(self.config.MERGE_DIR, filename) 
 
         if os.path.exists(output_path):
             os.remove(output_path)
 
-        command = ['ffmpeg', '-i', 'concat:' + '|'.join(filepaths), '-acodec', 'copy', output_path]
+        command = [self.config.FFMPEG_PATH, '-i', 'concat:' + '|'.join(filepaths), '-acodec', 'copy', output_path]
         subprocess.run(command, check=True)
 
         merge = Merge(title=title, filepath=output_path, format=output_format)
         data.add_to_merge(merge)
-        data.save()
+        data.save(data.path)
 
     def retrieve_merge(self, data : Data):
         merge_list = [m.serialize() for m in data.merge]

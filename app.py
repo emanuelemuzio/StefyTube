@@ -8,8 +8,13 @@ from src import Config, Service, Data, Router
 
 config = Config()
 data = Data.load(config.DATA_PATH)
+data.path = config.DATA_PATH
 service = Service(config=config)
-app = Flask(__name__, template_folder=config.TEMPLATE_DIR)
+app = Flask(
+    __name__, 
+    template_folder=config.TEMPLATE_DIR,
+    static_folder=config.STATIC_DIR
+)
 router = Router(app=app, service=service, data=data) 
 
 # === Avvio ===
@@ -27,7 +32,7 @@ def check_queue():
                 entry.status = "duplicate"
                 data.queue.remove(entry)
                 data.move_to_history(entry)
-                data.save()
+                data.save(config.DATA_PATH)
                 continue
 
             # Scarico l'entry (ritorna lista di entry completate)
@@ -41,7 +46,7 @@ def check_queue():
             for e in completed_entries:
                 data.move_to_history(e)
 
-            data.save()
+            data.save(config.DATA_PATH)
 
         time.sleep(2)
 
@@ -55,16 +60,18 @@ if __name__ == '__main__':
     time.sleep(1)
     threading.Thread(target=check_queue, daemon=True).start()
 
-    if args.window:
+    if args.window and 1 == 2:
         # Modalità finestra (desktop app)
         screen = webview.screens[0] 
         webview.create_window(config.APP_NAME, config.BASE_URL, width=screen.width, height=screen.height)
         webview.start()
     else:
-        # modalità browser 
-        # webbrowser.open(BASE_URL)
-        print("Server attivo...")
-        input()
+        print(f"Server attivo su {config.BASE_URL}...")
+        try:
+            while True:
+               time.sleep(1)
+        except KeyboardInterrupt:
+            print("Chiusura server...")
 
 # Chiudi log
 sys.stdout.close()

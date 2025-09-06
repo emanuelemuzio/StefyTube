@@ -12,18 +12,26 @@ class Config:
 
         self.host = '127.0.0.1'
         self.port = 5000
-        self.BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
-        self.TEMPLATE_DIR = os.path.join(self.BASE_DIR, 'templates')
+
+        if getattr(sys, 'frozen', False):
+            # Se eseguito come exe PyInstaller
+            self.BASE_DIR = os.path.dirname(sys.executable)
+        else:
+            self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+        self.TEMPLATE_DIR = self.resource_path('templates')
+        self.STATIC_DIR = self.resource_path('static')
+        self.FFMPEG_PATH = self.resource_path('ffmpeg.exe')
+
         self.DOWNLOAD_DIR = os.path.join(self.BASE_DIR, 'download')
-        self.FFMPEG_PATH = os.path.join(self.BASE_DIR, 'ffmpeg.exe')
         self.FFMPEG_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
         self.FFMPEG_ZIP_PATH = os.path.join(self.BASE_DIR, 'ffmpeg.zip')
         self.FFMPEG_EXTRACT_DIR = os.path.join(self.BASE_DIR, 'ffmpeg_tmp')
-        self.DATA_PATH = os.path.join(self.BASE_DIR, 'data.json')
+        self.DATA_PATH = os.path.join(os.path.dirname(sys.executable), "data.json")
         self.BASE_URL = f'http://{self.host}:{self.port}'
         self.APP_NAME = 'StefyTube'
         self.LOG_PATH = 'log.log'
-        self.MERGE_DIR = 'merge'
+        self.MERGE_DIR = os.path.join(self.BASE_DIR, 'merge')
 
         # === Crea le cartelle se non esistono ===
 
@@ -68,3 +76,10 @@ class Config:
 
             os.remove(self.FFMPEG_ZIP_PATH)
             shutil.rmtree(self.FFMPEG_EXTRACT_DIR, ignore_errors=True)  
+
+    def resource_path(self, relative_path):
+        try:
+            base_path = sys._MEIPASS
+        except AttributeError:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)

@@ -27,9 +27,10 @@ class Entry(BaseModel):
         return self.model_dump() 
 
 class Data(BaseModel): 
+    path : str = Field(default="", exclude=True)
     queue: List[Entry] = Field(default_factory=list) 
     history: List[Entry] = Field(default_factory=list) 
-    merge: List[Merge] = Field(default_factory=list)
+    merge: List[Merge] = Field(default_factory=list) 
 
     def get_history_entry_by_uuid(self, entry_uuid: str):
         for entry in self.history:
@@ -59,13 +60,13 @@ class Data(BaseModel):
                     print('!')
                 break
         self.merge = [m for m in self.merge if m.uuid != merge_uuid] 
-        self.save()
+        self.save(self.path)
     
     def remove_entry_by_uuid(self, entry_uuid: str): 
         """Rimuove un'entry dalla coda e dallo storico tramite UUID e salva lo stato.""" 
         self.queue = [e for e in self.queue if e.uuid != entry_uuid] 
         self.history = [e for e in self.history if e.uuid != entry_uuid] 
-        self.save() 
+        self.save(self.path) 
 
     def remove_history_entry_by_uuid(self, entry_uuid: str): 
         """Rimuove un'entry dallo storico tramite UUID e salva lo stato.""" 
@@ -77,7 +78,7 @@ class Data(BaseModel):
                     print('!')
                 break
         self.history = [e for e in self.history if e.uuid != entry_uuid] 
-        self.save() 
+        self.save(self.path) 
 
     def remove_queue_entry_by_uuid(self, entry_uuid: str): 
         """Rimuove un'entry dalla coda tramite UUID e salva lo stato.""" 
@@ -89,15 +90,16 @@ class Data(BaseModel):
                     print('!')
                 break
         self.queue = [e for e in self.queue if e.uuid != entry_uuid] 
-        self.save() 
+        self.save(self.path) 
         
     def move_to_history(self, entry: Entry): 
         self.history.append(entry) 
         self.queue = [e for e in self.queue if e.url != entry.url] 
         
-    def save(self, path: str = "data.json"): 
-        with open(path, "w", encoding="utf-8") as f: 
-            f.write(self.model_dump_json(indent=2)) 
+    def save(self, path: str | None = None): 
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(self.model_dump_json(indent=2))
+
             
     def add_to_queue(self, entry: Entry): 
         self.queue.append(entry) 

@@ -1,5 +1,6 @@
 import os
 import threading
+import mimetypes
 from flask import Flask
 from flask import render_template, request, jsonify, send_file
 from .requests import DownloadRequest, HistoryDeleteRequest, QueueDeleteRequest, MergeUuidList, MergeDeleteRequest
@@ -78,6 +79,7 @@ class Router:
                 threading.Thread(target=service.download_video, args=(download_request, data)).start()
                 return jsonify({'message': 'Download avviato'}), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500
 
         @app.get('/api/check_queue')
@@ -91,6 +93,7 @@ class Router:
                 response = service.retrieve_queue(data)
                 return jsonify(response), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500
             
         @app.get('/api/check_merge')
@@ -104,6 +107,7 @@ class Router:
                 response = service.retrieve_merge(data)
                 return jsonify(response), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500
         
         @app.get('/api/check_history')
@@ -117,6 +121,7 @@ class Router:
                 response = service.retrieve_history(data)
                 return jsonify(response), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500
 
         @app.get('/api/open_download_dir')
@@ -130,6 +135,7 @@ class Router:
                 service.open_download_dir()
                 return jsonify("Cartella dei download aperta con successo"), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500
             
         @app.post('/api/delete_from_merge')
@@ -144,6 +150,7 @@ class Router:
                 service.delete_from_merge(data, delete_request)
                 return jsonify("Rimozione avvenuta con successo"), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500
 
         @app.post('/api/delete_from_history')
@@ -158,6 +165,7 @@ class Router:
                 service.delete_from_history(data, delete_request)
                 return jsonify("Rimozione avvenuta con successo"), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500
             
         @app.post('/api/delete_from_queue')
@@ -172,6 +180,7 @@ class Router:
                 service.delete_from_queue(data, delete_request)
                 return jsonify("Rimozione avvenuta con successo"), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500
             
         @app.post('/api/merge_uuid_list')
@@ -186,13 +195,17 @@ class Router:
                 service.merge_uuid_list(data, merge_request)
                 return jsonify("Unione avvenuta con successo"), 200
             except Exception as e:
+                service.log(str(e))
                 return jsonify(str(e)), 500 
             
         @app.route("/api/play/<uuid>")
         def play(uuid):
-            # Qui recuperi l'Entry con quell'uuid
             item = data.get_history_entry_by_uuid(uuid) or data.get_merge_by_uuid(uuid)
             if not item or not item.filepath or not os.path.exists(item.filepath):
-                raise ValueError
+                raise ValueError("File non trovato")
 
-            return send_file(item.filepath, mimetype="audio/mpeg")
+            mime, _ = mimetypes.guess_type(item.filepath)
+            if mime is None:
+                mime = "application/octet-stream"  # fallback
+
+            return send_file(item.filepath, mimetype=mime, as_attachment=False)
