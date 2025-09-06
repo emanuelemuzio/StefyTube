@@ -47,7 +47,7 @@ def check_queue():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--window', action='store_true', help='Avvia in modalità finestra (PyWebView)')
+    parser.add_argument('--window', action='store_true', default=True, help='Avvia in modalità finestra (PyWebView)')
     args = parser.parse_args()
     
     # Avvia il server Flask in background
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     time.sleep(1)
     threading.Thread(target=check_queue, daemon=True).start()
 
-    if args.window == True:
+    if args.window:
         # Modalità finestra (desktop app)
         screen = webview.screens[0] 
         webview.create_window(config.APP_NAME, config.BASE_URL, width=screen.width, height=screen.height)
