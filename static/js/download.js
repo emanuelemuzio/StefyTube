@@ -72,7 +72,7 @@ $('#downloadForm').on('submit', function (e) {
     fetch('/api/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, format: formatSelected, noplaylist: playlistSelect.value === 'true'})
+        body: JSON.stringify({ url, format: formatSelected, noplaylist: playlistSelect.value === 'true' })
     })
         .then(res => {
             if (res.ok) {
@@ -160,7 +160,7 @@ function checkHistory() {
 
             const title = document.createElement('h5');
             title.className = 'mb-2';
-            title.textContent = 'Storico download:';
+            title.textContent = 'Storico download';
             container.appendChild(title);
 
             data.forEach(entry => {
@@ -186,23 +186,27 @@ function escapeHtml(text) {
 }
 
 // render entry in queue
-export function renderQueueEntry(entry) {
+function renderQueueEntry(entry) {
     const div = document.createElement('div');
-    div.className = 'mb-2 p-2 bg-dark text-light rounded';
+    div.className = 'queue-entry';
     div.id = `entry-${entry.uuid}`;
     div.innerHTML = `
         <strong>${entry.title ?? '(in preparazione...)'}</strong><br>
-        Formato: ${entry.format?.toUpperCase() ?? 'N/D'}<br>
-        Stato: ${entry.status ?? 'N/D'} – ${entry.progress ?? 0}%
-        <div class="progress mt-1" style="height: 8px;">
-            <div class="progress-bar" style="background-color: #d71612; width: ${entry.progress ?? 0}%"></div>
+        <small>Formato: ${entry.format?.toUpperCase() ?? 'N/D'} | Stato: ${entry.status ?? 'N/D'} – ${entry.progress ?? 0}%</small>
+        <div class="progress">
+            <div class="progress-bar" style="width: ${entry.progress ?? 0}%"></div>
         </div>
     `;
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-sm btn-danger mt-1';
+    const btn = document.createElement('a');
+    btn.href = "#"; // evita comportamento predefinito
+    btn.className = 'btn btn-danger btn-sm';
     btn.textContent = 'Elimina';
-    btn.addEventListener('click', () => deleteFromQueue(entry.uuid));
+    btn.addEventListener('click', (e) => {
+        e.preventDefault(); // impedisce lo scroll in alto
+        deleteFromQueue(entry.uuid);
+    });
     div.appendChild(btn);
+
 
     return div;
 }
@@ -210,15 +214,15 @@ export function renderQueueEntry(entry) {
 // render entry in history
 export function renderHistoryEntry(entry) {
     const div = document.createElement('div');
-    div.className = 'mb-2 p-2 bg-dark text-light rounded';
+    div.className = 'history-entry';
     div.id = `entry-${entry.uuid}`;
     div.innerHTML = `
         <strong>${entry.title ?? 'Titolo non disponibile'}</strong><br>
-        Formato: ${entry.format?.toUpperCase() ?? 'N/D'}<br>
-        Stato: ${entry.status ?? 'N/D'}
+        <small>Formato: ${entry.format?.toUpperCase() ?? 'N/D'} | Stato: ${entry.status ?? 'N/D'}</small>
+        <br>
     `;
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-sm btn-danger mt-1';
+    const btn = document.createElement('a');
+    btn.className = 'btn btn-sm btn-danger';
     btn.textContent = 'Elimina';
     btn.addEventListener('click', () => deleteFromHistory(entry.uuid));
     div.appendChild(btn);

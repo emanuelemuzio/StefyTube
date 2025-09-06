@@ -1,9 +1,8 @@
 import os
 import threading
 from flask import Flask
-from flask import render_template, request, jsonify
-from flask_swagger import swagger
-from .requests import DownloadRequest, HistoryDeleteRequest, QueueDeleteRequest
+from flask import render_template, request, jsonify, send_file
+from .requests import DownloadRequest, HistoryDeleteRequest, QueueDeleteRequest, MergeUuidList, MergeDeleteRequest
 from .service import Service
 from .data import Data
 
@@ -93,6 +92,19 @@ class Router:
                 return jsonify(response), 200
             except Exception as e:
                 return jsonify(str(e)), 500
+            
+        @app.get('/api/check_merge')
+        def check_merge():
+
+            """ 
+            API per il controllo dei file uniti. 
+            """
+
+            try:
+                response = service.retrieve_merge(data)
+                return jsonify(response), 200
+            except Exception as e:
+                return jsonify(str(e)), 500
         
         @app.get('/api/check_history')
         def check_history():
@@ -117,6 +129,20 @@ class Router:
             try:
                 service.open_download_dir()
                 return jsonify("Cartella dei download aperta con successo"), 200
+            except Exception as e:
+                return jsonify(str(e)), 500
+            
+        @app.post('/api/delete_from_merge')
+        def delete_from_merge():
+
+            """ 
+            API per la rimozione di un'entry dalla history.
+            """
+
+            try:
+                delete_request = MergeDeleteRequest(**request.get_json())
+                service.delete_from_merge(data, delete_request)
+                return jsonify("Rimozione avvenuta con successo"), 200
             except Exception as e:
                 return jsonify(str(e)), 500
 
@@ -147,3 +173,26 @@ class Router:
                 return jsonify("Rimozione avvenuta con successo"), 200
             except Exception as e:
                 return jsonify(str(e)), 500
+            
+        @app.post('/api/merge_uuid_list')
+        def merge_uuid_list():
+
+            """ 
+            API per la concatenazione di diversi file in un unico output. I file devono chiaramente avere lo stesso formato.
+            """
+
+            try:
+                merge_request = MergeUuidList(**request.get_json())
+                service.merge_uuid_list(data, merge_request)
+                return jsonify("Unione avvenuta con successo"), 200
+            except Exception as e:
+                return jsonify(str(e)), 500 
+            
+        @app.route("/api/play/<uuid>")
+        def play(uuid):
+            # Qui recuperi l'Entry con quell'uuid
+            item = data.get_history_entry_by_uuid(uuid) or data.get_merge_by_uuid(uuid)
+            if not item or not item.filepath or not os.path.exists(item.filepath):
+                raise ValueError
+
+            return send_file(item.filepath, mimetype="audio/mpeg")

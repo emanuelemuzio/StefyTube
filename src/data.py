@@ -3,6 +3,15 @@ import uuid
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field 
 
+class Merge(BaseModel):
+    uuid: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: Optional[str] = None
+    filepath: Optional[str] = None
+    format: Literal["mp4", "mp3"] = "mp3"
+
+    def serialize(self):
+        return self.model_dump()
+
 class Entry(BaseModel): 
     uuid: str = Field(default_factory=lambda: str(uuid.uuid4())) 
     id: Optional[str] = None 
@@ -13,26 +22,14 @@ class Entry(BaseModel):
     status: Literal["queued", "downloading", "completed", "failed", "duplicate"] = "queued" 
     progress: Optional[int] = None # percentuale 
     format: Literal["mp4", "mp3"] = "mp3"
-    
-class EntryResponse(BaseModel):
-    uuid: Optional[str] = None
-    url: Optional[str] = None
-    title: Optional[str] = None  
-    status: Optional[str] = None 
-    progress: Optional[int] = None # percentuale 
-    format: Optional[str] = None
-    
-    @staticmethod
-    def from_entry(entry: Entry):
-        return EntryResponse(**entry.model_dump(include={"uuid", "url", "title", "status", "progress", "format"}))
 
-    @staticmethod
-    def serializable_from_entry(entry: Entry):
-        return EntryResponse(**entry.model_dump(include={"uuid", "url", "title", "status", "progress", "format"})).model_dump()
+    def serialize(self):
+        return self.model_dump() 
 
 class Data(BaseModel): 
     queue: List[Entry] = Field(default_factory=list) 
     history: List[Entry] = Field(default_factory=list) 
+    merge: List[Merge] = Field(default_factory=list)
 
     def get_history_entry_by_uuid(self, entry_uuid: str):
         for entry in self.history:
@@ -45,6 +42,24 @@ class Data(BaseModel):
             if entry.uuid == entry_uuid:
                 return entry
         return None
+    
+    def get_merge_by_uuid(self, merge_uuid: str):
+        for merge in self.merge:
+            if merge.uuid == merge_uuid:
+                return merge
+        return None
+    
+    def remove_merge_by_uuid(self, merge_uuid : str):
+        """Rimuove un merge dalla lista in base all'uuid""" 
+        for m in self.merge:
+            if m.uuid == merge_uuid:
+                try:
+                    os.remove(m.filepath)
+                except Exception as e:
+                    print('!')
+                break
+        self.merge = [m for m in self.merge if m.uuid != merge_uuid] 
+        self.save()
     
     def remove_entry_by_uuid(self, entry_uuid: str): 
         """Rimuove un'entry dalla coda e dallo storico tramite UUID e salva lo stato.""" 
@@ -86,6 +101,9 @@ class Data(BaseModel):
             
     def add_to_queue(self, entry: Entry): 
         self.queue.append(entry) 
+
+    def add_to_merge(self, merge : Merge):
+        self.merge.append(merge)
         
     def should_download(self, entry: Entry) -> bool:
     # verifica se esiste già nella history una entry completata con stessa URL e formato

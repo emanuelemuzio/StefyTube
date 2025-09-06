@@ -4,10 +4,8 @@ import platform
 import subprocess
 from flask import jsonify
 from .config import Config
-from .data import Data, Entry, EntryResponse
-from .requests import DownloadRequest, HistoryDeleteRequest, QueueDeleteRequest
-
-# === Funzioni core e di utility di download ===
+from .data import Data, Entry, Merge
+from .requests import DownloadRequest, HistoryDeleteRequest, QueueDeleteRequest, MergeUuidList, MergeDeleteRequest
 
 class Service:
 
@@ -101,11 +99,11 @@ class Service:
         return completed_entries
 
     def retrieve_history(self, data : Data):
-        history_list = [EntryResponse.serializable_from_entry(e) for e in data.history]
+        history_list = [e.serialize() for e in data.history]
         return history_list
     
-    def retrieve_queue(self, data):
-        queue_list = [EntryResponse.serializable_from_entry(e) for e in data.queue]
+    def retrieve_queue(self, data : Data):
+        queue_list = [e.serialize() for e in data.queue]
         return queue_list
     
     def open_download_dir(self):
@@ -126,4 +124,39 @@ class Service:
         data.remove_history_entry_by_uuid(request.uuid)
 
     def delete_from_queue(self, data : Data, request : QueueDeleteRequest):
-        data.remove_queue_entry_by_uuid(request.uuid)
+        data.remove_queue_entry_by_uuid(request.uuid) 
+
+    def delete_from_merge(self, data : Data, request : MergeDeleteRequest):
+        data.remove_merge_by_uuid(request.uuid) 
+
+    def merge_uuid_list(self, data : Data, request : MergeUuidList):
+        uuids = request.uuids
+        entries_to_merge = list(filter(lambda x : x.uuid in uuids, data.history))
+        format_check_list = set(map(lambda x : x.format, entries_to_merge))
+        output_format = None
+
+        if len(entries_to_merge) != len(uuids):
+            raise ValueError("UUIDs list mismatch")
+
+        if len(format_check_list) > 1:
+            raise ValueError("Format error")
+        
+        output_format = format_check_list.pop()
+        filepaths = list(map(lambda x : x.filepath, entries_to_merge))
+        title = request.title
+        filename = f"{title}.{output_format}"
+        output_path = os.path.join(self.config.MERGE_DIR, filename)
+
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+        command = ['ffmpeg', '-i', 'concat:' + '|'.join(filepaths), '-acodec', 'copy', output_path]
+        subprocess.run(command, check=True)
+
+        merge = Merge(title=title, filepath=output_path, format=output_format)
+        data.add_to_merge(merge)
+        data.save()
+
+    def retrieve_merge(self, data : Data):
+        merge_list = [m.serialize() for m in data.merge]
+        return merge_list

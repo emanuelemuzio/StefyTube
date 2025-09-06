@@ -23,10 +23,12 @@ class Config:
         self.BASE_URL = f'http://{self.host}:{self.port}'
         self.APP_NAME = 'StefyTube'
         self.LOG_PATH = 'log.log'
+        self.MERGE_DIR = 'merge'
 
         # === Crea le cartelle se non esistono ===
 
         os.makedirs(self.DOWNLOAD_DIR, exist_ok=True)
+        os.makedirs(self.MERGE_DIR, exist_ok=True)
 
         # === Logging ===
 
