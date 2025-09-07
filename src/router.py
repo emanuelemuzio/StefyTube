@@ -138,6 +138,20 @@ class Router:
                 service.log(str(e))
                 return jsonify(str(e)), 500
             
+        @app.get('/api/open_merge_dir')
+        def open_merge_dir():
+            
+            """ 
+            API per l'apertura della cartella dei file merged.
+            """
+
+            try:
+                service.open_merge_dir()
+                return jsonify("Cartella dei merge aperta con successo"), 200
+            except Exception as e:
+                service.log(str(e))
+                return jsonify(str(e)), 500
+            
         @app.post('/api/delete_from_merge')
         def delete_from_merge():
 

@@ -353,3 +353,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+function openMerge(e) {
+    e.preventDefault();
+    fetch('/api/open_merge_dir')
+        .then(res => {
+            if (res.ok) {
+                alert("Cartella aperta con successo");
+            } else {
+                res.json()
+                    .then(data => alert("Errore: " + (data.error || "Errore generico")))
+                    .catch(() => alert("Errore generico dal server"));
+            }
+        })
+        .catch(err => alert("Errore nella richiesta: " + err));
+}
+
+document.getElementById('openMergeBtn').onclick = openMerge;

@@ -97,10 +97,14 @@
 
 {% macro playerShuffle() %}
 <div class="text-center mb-4">
-    <button id="shuffleBtn" class="btn mb-3" onclick="toggleShuffle()"
-        style="background-color: #d71612; color: white; border: none;">
-        Riproduzione casuale
-    </button>
+    <div class="d-flex justify-content-center align-items-center gap-2 mb-2" style="display: none;" id="controlsRow">
+        <button id="shuffleBtn" class="btn" onclick="toggleShuffle()"
+            style="background-color: #d71612; color: white; border: none;">
+            Riproduzione casuale
+        </button>
+
+        <button id="openMergeBtn" class="btn btn-secondary">📂 Apri cartella file uniti</button>
+    </div>
 
     <div class="d-flex justify-content-center align-items-center gap-2 mb-2" style="display: none;" id="controlsRow">
         <button class="btn btn-secondary" onclick="prevTrack()">Precedente</button>

@@ -120,6 +120,20 @@ class Service:
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)})
         
+    def open_merge_dir(self):
+        merge_path = os.path.join(os.getcwd(), self.config.MERGE_DIR)
+
+        try:
+            if platform.system() == 'Windows':
+                os.startfile(merge_path)
+            elif platform.system() == 'Darwin':  # macOS
+                subprocess.Popen(['open', merge_path])
+            else:  # Linux
+                subprocess.Popen(['xdg-open', merge_path])
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+        
     def delete_from_history(self, data : Data, request : HistoryDeleteRequest):
         data.remove_history_entry_by_uuid(request.uuid)
 
