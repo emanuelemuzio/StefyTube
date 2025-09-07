@@ -60,7 +60,7 @@ if __name__ == '__main__':
     time.sleep(1)
     threading.Thread(target=check_queue, daemon=True).start()
 
-    if args.window and 1 == 2:
+    if args.window:
         # Modalità finestra (desktop app)
         screen = webview.screens[0] 
         webview.create_window(config.APP_NAME, config.BASE_URL, width=screen.width, height=screen.height)
