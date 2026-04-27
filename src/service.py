@@ -34,11 +34,6 @@ class Service:
                     entry.status = "downloading"
             elif d["status"] == "finished":
                 entry.status = "completed"
-                if entry.format == "mp3":
-                    # sostituisci estensione con .mp3
-                    entry.filepath = os.path.splitext(d.get("filename", entry.filepath))[0] + ".mp3"
-                else:
-                    entry.filepath = d.get("filename") or entry.filepath
 
         outtmpl = os.path.join(self.config.DOWNLOAD_DIR, "%(title)s.%(ext)s")
 
@@ -49,7 +44,8 @@ class Service:
                     { 
                         "key": "FFmpegExtractAudio", 
                         "preferredcodec": "mp3", 
-                        "preferredquality": "192", 
+                        "preferredquality": "192",
+                        "keep_video": False
                     }
                 ], 
                 "progress_hooks": [
@@ -58,8 +54,8 @@ class Service:
                 "quiet": True, 
                 "outtmpl" : outtmpl,
                 "noplaylist": entry.noplaylist,
-                "ffmpeg_location": self.config.FFMPEG_PATH
-            } 
+                "ffmpeg_location": os.path.dirname(self.config.FFMPEG_PATH)
+            }
         else: 
             # mp4 
             ydl_opts = { 
@@ -71,8 +67,8 @@ class Service:
                 "quiet": True, 
                 "outtmpl" : outtmpl, 
                 "noplaylist": entry.noplaylist,
-                "ffmpeg_location": self.config.FFMPEG_PATH
-            } 
+                "ffmpeg_location": os.path.dirname(self.config.FFMPEG_PATH)
+            }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(entry.url, download=True)
@@ -80,7 +76,19 @@ class Service:
                 # playlist o singolo video
                 entries_to_process = info.get("entries") or [info]
                 for video_info in entries_to_process:
-                    filepath_final = entry.filepath or video_info.get("_filename") or video_info.get("filepath") 
+                    # Get the actual final filename from yt-dlp
+                    filepath_final = video_info.get("_filename")
+                    
+                    # If MP3, verify the file exists with .mp3 extension
+                    if entry.format == "mp3" and filepath_final:
+                        mp3_path = os.path.splitext(filepath_final)[0] + ".mp3"
+                        if os.path.exists(mp3_path):
+                            filepath_final = mp3_path
+                    
+                    # If still no path, try alternatives
+                    if not filepath_final:
+                        filepath_final = video_info.get("filepath")
+                    
                     e = Entry(
                         id=video_info.get("id"),
                         url=video_info.get("webpage_url", entry.url),
@@ -144,6 +152,8 @@ class Service:
         data.remove_merge_by_uuid(request.uuid) 
 
     def merge_uuid_list(self, data : Data, request : MergeUuidList):
+        import tempfile
+        
         uuids = request.uuids
         entries_to_merge = list(filter(lambda x : x.uuid in uuids, data.history))
         format_check_list = set(map(lambda x : x.format, entries_to_merge))
@@ -157,15 +167,72 @@ class Service:
         
         output_format = format_check_list.pop()
         filepaths = list(map(lambda x : x.filepath, entries_to_merge))
+        
+        # Validate all files exist before merge
+        for fp in filepaths:
+            if not fp or not os.path.exists(fp):
+                raise ValueError(f"Input file not found: {fp}")
+        
         title = request.title
         filename = f"{title}.{output_format}"  
-        output_path = os.path.join(self.config.MERGE_DIR, filename) 
-
+        output_path = os.path.join(self.config.MERGE_DIR, filename)
+        
+        # Generate unique filename if output already exists
         if os.path.exists(output_path):
-            os.remove(output_path)
+            base, ext = os.path.splitext(output_path)
+            counter = 1
+            while os.path.exists(f"{base}_{counter}{ext}"):
+                counter += 1
+            output_path = f"{base}_{counter}{ext}"
 
-        command = [self.config.FFMPEG_PATH, '-i', 'concat:' + '|'.join(filepaths), '-acodec', 'copy', output_path]
-        subprocess.run(command, check=True)
+        try:
+            if output_format == "mp3":
+                # For MP3, use concat demuxer with file list to handle paths with spaces/special chars
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+                    for fp in filepaths:
+                        f.write(f"file '{fp}'\n")
+                    concat_file = f.name
+                
+                try:
+                    command = [
+                        self.config.FFMPEG_PATH,
+                        '-f', 'concat',
+                        '-safe', '0',
+                        '-i', concat_file,
+                        '-c', 'copy',
+                        '-y',
+                        output_path
+                    ]
+                    result = subprocess.run(command, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        raise Exception(f"FFmpeg merge failed: {result.stderr}")
+                finally:
+                    os.unlink(concat_file)
+            else:
+                # For video (MKV), use concat demuxer with file list
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+                    for fp in filepaths:
+                        f.write(f"file '{fp}'\n")
+                    concat_file = f.name
+                
+                try:
+                    command = [
+                        self.config.FFMPEG_PATH,
+                        '-f', 'concat',
+                        '-safe', '0',
+                        '-i', concat_file,
+                        '-c', 'copy',
+                        '-y',
+                        output_path
+                    ]
+                    result = subprocess.run(command, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        raise Exception(f"FFmpeg merge failed: {result.stderr}")
+                finally:
+                    os.unlink(concat_file)
+        except Exception as e:
+            self.log(f"Merge failed: {str(e)}")
+            raise
 
         merge = Merge(title=title, filepath=output_path, format=output_format)
         data.add_to_merge(merge)

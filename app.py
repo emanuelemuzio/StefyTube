@@ -25,12 +25,18 @@ def start_flask():
 
 def check_queue():
     while True:
-        for entry in list(data.queue):
+        queue_copy = list(data.queue)  # Create snapshot
+        for entry in queue_copy:
+            # Skip if entry was already removed from queue
+            if entry not in data.queue:
+                continue
+            
             # Entry duplicata o già completata
             if not data.should_download(entry):
                 print(f"Video duplicato: {entry.title or entry.url} (ID: {entry.id})")
                 entry.status = "duplicate"
-                data.queue.remove(entry)
+                if entry in data.queue:
+                    data.queue.remove(entry)
                 data.move_to_history(entry)
                 data.save(config.DATA_PATH)
                 continue
@@ -38,7 +44,7 @@ def check_queue():
             # Scarico l'entry (ritorna lista di entry completate)
             completed_entries = service.download_entry(entry)
 
-            # Rimuovo l'entry originale dalla queue
+            # Rimuovo l'entry originale dalla queue (se ancora presente)
             if entry in data.queue:
                 data.queue.remove(entry)
 

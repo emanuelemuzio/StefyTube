@@ -232,5 +232,26 @@ export function renderHistoryEntry(entry) {
 
 document.getElementById('openDownloadsBtn').onclick = openDownloads;
 
-setInterval(checkQueue, 500);
-setInterval(checkHistory, 1000); 
+// Adaptive polling: faster when queue has items, slower when empty
+let queuePollingInterval = 2000;
+let historyPollingInterval = 2000;
+let queueIntervalId;
+let historyIntervalId;
+
+function adaptiveCheckQueue() {
+    checkQueue();
+    // If queue is empty, increase polling interval; otherwise use faster rate
+    const container = document.getElementById('downloadStatus');
+    if (container && container.children.length > 1) {  // Has title + entries
+        queuePollingInterval = 500;  // Active downloads: check frequently
+    } else {
+        queuePollingInterval = 2000;  // Empty queue: check less frequently
+    }
+    
+    clearInterval(queueIntervalId);
+    queueIntervalId = setInterval(adaptiveCheckQueue, queuePollingInterval);
+}
+
+// Start initial polling
+queueIntervalId = setInterval(adaptiveCheckQueue, queuePollingInterval);
+historyIntervalId = setInterval(checkHistory, historyPollingInterval);

@@ -54,10 +54,13 @@ class Data(BaseModel):
         """Rimuove un merge dalla lista in base all'uuid""" 
         for m in self.merge:
             if m.uuid == merge_uuid:
-                try:
-                    os.remove(m.filepath)
-                except Exception as e:
-                    print('!')
+                if m.filepath:
+                    try:
+                        os.remove(m.filepath)
+                    except FileNotFoundError:
+                        pass
+                    except Exception as e:
+                        print(f'Error removing merge file: {e}')
                 break
         self.merge = [m for m in self.merge if m.uuid != merge_uuid] 
         self.save(self.path)
@@ -72,29 +75,35 @@ class Data(BaseModel):
         """Rimuove un'entry dallo storico tramite UUID e salva lo stato.""" 
         for e in self.history:
             if e.uuid == entry_uuid:
-                try:
-                    os.remove(e.filepath)
-                except Exception as e:
-                    print('!')
+                if e.filepath:
+                    try:
+                        os.remove(e.filepath)
+                    except FileNotFoundError:
+                        pass
+                    except Exception as e:
+                        print(f'Error removing history file: {e}')
                 break
         self.history = [e for e in self.history if e.uuid != entry_uuid] 
-        self.save(self.path) 
+        self.save(self.path)
 
     def remove_queue_entry_by_uuid(self, entry_uuid: str): 
         """Rimuove un'entry dalla coda tramite UUID e salva lo stato.""" 
         for e in self.queue:
             if e.uuid == entry_uuid:
-                try:
-                    os.remove(e.filepath)
-                except Exception as e:
-                    print('!')
+                if e.filepath:
+                    try:
+                        os.remove(e.filepath)
+                    except FileNotFoundError:
+                        pass
+                    except Exception as e:
+                        print(f'Error removing queue file: {e}')
                 break
         self.queue = [e for e in self.queue if e.uuid != entry_uuid] 
-        self.save(self.path) 
+        self.save(self.path)
         
     def move_to_history(self, entry: Entry): 
         self.history.append(entry) 
-        self.queue = [e for e in self.queue if e.url != entry.url] 
+        self.queue = [e for e in self.queue if e.uuid != entry.uuid]
         
     def save(self, path: str | None = None): 
         with open(path, "w", encoding="utf-8") as f:
