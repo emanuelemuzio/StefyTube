@@ -43,3 +43,4 @@ video-playlist/*.json
 Thumbs.db
 _internal
 venv
+CLAUDE.md
